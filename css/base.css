@@ -1,0 +1,169 @@
+/* ========================================================================
+   Reset, typography, drafting-grid background.
+   Keep this lean — component styles live elsewhere.
+   ======================================================================== */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body, h1, h2, h3, h4, h5, h6, p, figure, blockquote, dl, dd {
+  margin: 0;
+}
+
+html {
+  font-size: 16px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  min-height: 100vh;
+  background: var(--bg-solid);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: var(--fs-base);
+  font-weight: 350; /* dark-mode: drop body from 400 */
+  line-height: 1.55;
+  letter-spacing: -0.005em;
+  overflow-x: hidden;
+}
+
+/* Drafting grid — two linear-gradients for crosshair ruling.
+   Strong lines every 4th cell. Grid sits behind everything, faint. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(to right, var(--grid-color) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--grid-color) 1px, transparent 1px),
+    linear-gradient(to right, var(--grid-strong) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--grid-strong) 1px, transparent 1px);
+  background-size:
+    var(--grid-size) var(--grid-size),
+    var(--grid-size) var(--grid-size),
+    calc(var(--grid-size) * 4) calc(var(--grid-size) * 4),
+    calc(var(--grid-size) * 4) calc(var(--grid-size) * 4);
+  mask-image: radial-gradient(ellipse at center, black 40%, transparent 95%);
+  z-index: 0;
+}
+
+/* Subtle warm vignette — atmosphere.
+   Also doubles as the TIMER WARNING overlay:
+   when the per-question timer enters warn/urgent state, the body gets
+   `.tm-warn` or `.tm-urgent`, which swaps this vignette to amber/red.
+   Transition is gentle so it washes in gradually as time runs out. */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background:
+    radial-gradient(ellipse 80% 50% at 50% 0%, rgba(196, 121, 90, 0.04), transparent 70%),
+    radial-gradient(ellipse 70% 40% at 50% 100%, rgba(196, 121, 90, 0.02), transparent 70%);
+  transition: background 700ms var(--ease-out);
+}
+
+body.tm-warn::after {
+  background:
+    radial-gradient(ellipse 90% 55% at 50% 100%, rgba(200, 154, 90, 0.13), transparent 65%),
+    radial-gradient(ellipse 70% 40% at 50% 0%,   rgba(200, 154, 90, 0.06), transparent 70%);
+}
+
+body.tm-urgent::after {
+  background:
+    radial-gradient(ellipse 110% 70% at 50% 100%, rgba(180, 75, 66, 0.26), transparent 70%),
+    radial-gradient(ellipse 100% 50% at 50% 0%,   rgba(180, 75, 66, 0.16), transparent 65%),
+    radial-gradient(circle   50% 60% at 0%   50%, rgba(180, 75, 66, 0.12), transparent 55%),
+    radial-gradient(circle   50% 60% at 100% 50%, rgba(180, 75, 66, 0.12), transparent 55%);
+  animation: tm-urgent-breathe 1.3s ease-in-out infinite alternate;
+}
+@keyframes tm-urgent-breathe {
+  from { opacity: 0.82; }
+  to   { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  body.tm-urgent::after { animation: none; }
+}
+
+/* Put everything else above the grid */
+body > * { position: relative; z-index: 1; }
+
+/* ---------- Typography ---------- */
+
+h1, .h1 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: var(--fs-xxl);
+  line-height: 1.02;
+  letter-spacing: -0.04em; /* tight tracking — premium sans signature */
+  color: var(--text);
+}
+
+h2, .h2 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: var(--fs-xl);
+  line-height: 1.08;
+  letter-spacing: -0.03em;
+}
+
+h3, .h3 {
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: var(--fs-lg);
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+}
+
+p { max-width: 65ch; }
+
+.mono { font-family: var(--font-mono); letter-spacing: 0; }
+
+.eyebrow {
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  font-weight: 400;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.italic { font-style: italic; }
+.muted { color: var(--text-muted); }
+.secondary { color: var(--text-secondary); }
+.accent { color: var(--accent); }
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  transition: border-color var(--d-fast) var(--ease-out),
+              color var(--d-fast) var(--ease-out);
+}
+a:hover { border-bottom-color: var(--accent); color: var(--accent-hover); }
+
+button, input, select, textarea { font: inherit; color: inherit; }
+
+::selection {
+  background: var(--accent-dim);
+  color: var(--text);
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--r-sm);
+}
+
+/* Respect motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

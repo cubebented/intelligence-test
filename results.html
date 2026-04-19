@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Results · Cognitive Assessment</title>
+  <meta name="color-scheme" content="dark" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='10' fill='none' stroke='%23c4795a' stroke-width='2'/%3E%3Ccircle cx='12' cy='12' r='3' fill='%23c4795a'/%3E%3C/svg%3E" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" />
+
+  <script>
+    (function(){
+      const v = Date.now();
+      ["css/tokens.css","css/base.css","css/components.css","css/test.css"].forEach(href => {
+        const link = document.createElement("link");
+        link.rel = "stylesheet";
+        link.href = href + "?v=" + v;
+        document.head.appendChild(link);
+      });
+    })();
+  </script>
+</head>
+<body>
+  <main class="results" id="results">
+    <!-- populated by results.js -->
+  </main>
+  <script type="module">
+    /* Cache-bust: inline bootstrap re-imports fresh module on each load */
+    const m = await import('./js/results.js?v=' + Date.now());
+  </script>
+</body>
+</html>

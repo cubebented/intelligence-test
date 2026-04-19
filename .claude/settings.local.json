@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -m http.server 8765)",
+      "Bash(kill %bwirzk3sn)",
+      "Bash(curl -sI http://localhost:8765/)",
+      "mcp__Claude_Preview__preview_start",
+      "Bash(kill 877)",
+      "Bash(node -c C:\\\\Users\\\\cube\\\\Downloads\\\\IQTest\\\\js\\\\results.js)",
+      "Bash(node --check js/results.js)",
+      "Bash(node --check js/test.js)",
+      "Bash(python -m http.server 8000)",
+      "Bash(curl -s -o /dev/null -w \"HTTP %{http_code}\\\\n\" http://localhost:8000/)",
+      "Bash(node --check js/questions/logic-puzzle.js)",
+      "Bash(node --check js/questions/verbal-analogy.js)",
+      "Bash(node --check js/questions/index.js)",
+      "Bash(node --check js/questions/anagram.js)",
+      "Bash(vercel whoami *)",
+      "Bash(git config *)"
+    ]
+  }
+}
