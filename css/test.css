@@ -2097,11 +2097,20 @@
   max-width: 640px;
 }
 .reveal-stage[hidden] { display: none; }
+
+/* Pre-staged (already un-hidden but NOT yet animating in).
+   This prevents the "flash of fully-visible content" between the
+   moment we remove [hidden] and the moment --in starts. */
+.reveal-stage--pending {
+  opacity: 0;
+  transform: translateY(24px);
+  pointer-events: none;
+}
 .reveal-stage--in {
-  animation: reveal-stage-in 700ms var(--ease-out) both;
+  animation: reveal-stage-in 700ms var(--ease-out) forwards;
 }
 .reveal-stage--out {
-  animation: reveal-stage-out 340ms var(--ease-in) both;
+  animation: reveal-stage-out 340ms var(--ease-in) forwards;
   pointer-events: none;
 }
 @keyframes reveal-stage-in {
@@ -2148,18 +2157,20 @@
   to   { opacity: 1;    }
 }
 
-/* Ellipsis dots — pulse one at a time to suggest "thinking / building up" */
+/* Ellipsis dots — pulse one at a time to suggest "thinking / building up".
+   Sit on their own row BELOW the "Your IQ is" phrase. */
 .reveal-preamble__dots {
-  display: inline-flex;
-  gap: 3px;
-  margin-left: 0.1em;
+  display: flex;
+  gap: 8px;
+  justify-content: center;
   align-items: center;
   opacity: 0;
   animation: preamble-dots-in 400ms var(--ease-out) 950ms forwards;
+  margin-top: var(--s-3);
 }
 .reveal-preamble__dot {
-  width: 4px;
-  height: 4px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
   background: var(--accent);
   opacity: 0.5;
@@ -2194,15 +2205,18 @@
   transform-origin: center center;
 }
 
-/* Number "punch" on impact — overshoot + glow spike. Spring curve. */
+/* Number "punch" on impact — overshoot + glow spike. Spring curve.
+   Must keep opacity:1 in every frame because this animation replaces
+   the entry animation and would otherwise revert to the base opacity:0. */
 .reveal-number--impact {
+  opacity: 1;
   animation: number-punch 900ms cubic-bezier(0.22, 1.4, 0.36, 1) forwards;
 }
 @keyframes number-punch {
-  0%   { transform: scale(1);    filter: drop-shadow(0 8px 80px  rgba(196, 121, 90, 0.32)); }
-  25%  { transform: scale(1.14); filter: drop-shadow(0 10px 160px rgba(196, 121, 90, 0.95)); }
-  55%  { transform: scale(0.97); filter: drop-shadow(0 8px 100px rgba(196, 121, 90, 0.55)); }
-  100% { transform: scale(1);    filter: drop-shadow(0 8px 90px  rgba(196, 121, 90, 0.5)); }
+  0%   { opacity: 1; transform: scale(1);    filter: drop-shadow(0 8px 80px  rgba(196, 121, 90, 0.32)); }
+  25%  { opacity: 1; transform: scale(1.14); filter: drop-shadow(0 10px 160px rgba(196, 121, 90, 0.95)); }
+  55%  { opacity: 1; transform: scale(0.97); filter: drop-shadow(0 8px 100px rgba(196, 121, 90, 0.55)); }
+  100% { opacity: 1; transform: scale(1);    filter: drop-shadow(0 8px 90px  rgba(196, 121, 90, 0.5)); }
 }
 
 /* ─── Shockwave rings ─── */
@@ -2433,37 +2447,40 @@
 .rs-stats-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: var(--s-6);
+  gap: var(--s-8);           /* more column breathing room */
   width: 100%;
-  max-width: 540px;
+  max-width: 640px;          /* wider so each cell gets more space */
   padding: var(--s-6) var(--s-4);
   border-top: 1px solid var(--border);
   border-bottom: 1px solid var(--border);
 }
-@media (max-width: 560px) {
+@media (max-width: 620px) {
   .rs-stats-grid { grid-template-columns: 1fr; gap: var(--s-5); }
 }
 .rs-stat {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
+  gap: 4px;
+  min-width: 0;              /* allow cell to shrink without overflow */
 }
 .rs-stat__n {
   font-family: var(--font-display);
-  font-size: clamp(2.6rem, 6vw, 3.8rem);
+  font-size: clamp(2.4rem, 5vw, 3.4rem);
   font-weight: 600;
   color: var(--accent);
   letter-spacing: -0.04em;
   line-height: 1;
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;       /* keep "6m 12s" on ONE line */
 }
 .rs-stat__d {
   font-family: var(--font-display);
-  font-size: var(--fs-md);
+  font-size: var(--fs-sm);
   color: var(--text-faint);
   font-weight: 400;
   margin-top: 2px;
+  white-space: nowrap;
 }
 .rs-stat__l {
   font-family: var(--font-mono);
@@ -2472,6 +2489,13 @@
   text-transform: uppercase;
   color: var(--text-muted);
   margin-top: var(--s-2);
+  white-space: nowrap;
+}
+
+/* Time value ("6m 12s") is inherently wider than a digit — size it down
+   slightly so all three cells read with a consistent visual weight. */
+.rs-stat--time .rs-stat__n {
+  font-size: clamp(1.8rem, 3.8vw, 2.6rem);
 }
 
 /* (Legacy .results-simple__* classes were replaced by .reveal-* — removed) */

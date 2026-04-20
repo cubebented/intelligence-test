@@ -355,13 +355,13 @@ function renderResults({ iq, band, description, person, stats, source }) {
         <p class="reveal-preamble">
           <span class="reveal-preamble__word">Your</span><!--
        --><span class="reveal-preamble__word">IQ</span><!--
-       --><span class="reveal-preamble__word">is</span><!--
-       --><span class="reveal-preamble__dots" aria-hidden="true">
-            <span class="reveal-preamble__dot"></span>
-            <span class="reveal-preamble__dot"></span>
-            <span class="reveal-preamble__dot"></span>
-          </span>
+       --><span class="reveal-preamble__word">is</span>
         </p>
+        <div class="reveal-preamble__dots" aria-hidden="true">
+          <span class="reveal-preamble__dot"></span>
+          <span class="reveal-preamble__dot"></span>
+          <span class="reveal-preamble__dot"></span>
+        </div>
 
         <div class="reveal-number" id="reveal-number" aria-live="polite">
           <!-- Concentric shockwave rings — expand outward when the number lands -->
@@ -390,7 +390,7 @@ function renderResults({ iq, band, description, person, stats, source }) {
             <span class="rs-stat__d">%</span>
             <span class="rs-stat__l">accuracy</span>
           </div>
-          <div class="rs-stat">
+          <div class="rs-stat rs-stat--time">
             <span class="rs-stat__n" id="stat-time">${formatDuration(stats.totalMs)}</span>
             <span class="rs-stat__l">total time</span>
           </div>
@@ -432,21 +432,40 @@ function renderResults({ iq, band, description, person, stats, source }) {
   });
 }
 
-/* Fade out the current stage, then fade in the next. Keeps the viewport
-   from "stacking" old + new content during a reveal transition. */
+/* Fade out the current stage, then fade in the next.
+   Sequencing matters to avoid any visual overlap or pre-animation flash:
+     1. Add --out on the current stage (300ms fade/slide up & away)
+     2. Wait for it to fully finish (360ms) and mark it hidden
+     3. Pre-stage the next: mark --pending (zero opacity/translateY) first
+     4. On the next frame remove hidden so it renders in the pending state
+     5. On the next frame after THAT, swap --pending → --in so the
+        transition starts from a known, styled initial state. */
 function transitionStage(outId, inId, onAfterIn) {
-  const out = document.getElementById(outId);
+  const out  = document.getElementById(outId);
   const next = document.getElementById(inId);
   if (!next) return;
+
+  const revealNext = () => {
+    next.classList.add("reveal-stage--pending");
+    next.hidden = false;
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        next.classList.remove("reveal-stage--pending");
+        next.classList.add("reveal-stage--in");
+        if (onAfterIn) setTimeout(onAfterIn, 200);
+      });
+    });
+  };
+
   if (out) {
     out.classList.add("reveal-stage--out");
-    setTimeout(() => { out.hidden = true; }, 360);
+    setTimeout(() => {
+      out.hidden = true;
+      revealNext();
+    }, 360);
+  } else {
+    revealNext();
   }
-  setTimeout(() => {
-    next.hidden = false;
-    requestAnimationFrame(() => next.classList.add("reveal-stage--in"));
-    if (onAfterIn) setTimeout(onAfterIn, 200);
-  }, 300);
 }
 
 /* Aggressively-eased count-up: fast ramp, dramatic deceleration.
