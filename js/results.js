@@ -347,6 +347,9 @@ function renderResults({ iq, band, description, person, stats, source }) {
   root.innerHTML = `
     <article class="reveal-screen">
 
+      <!-- Full-viewport flash — triggered when the count-up lands -->
+      <div class="reveal-flash" id="reveal-flash" aria-hidden="true"></div>
+
       <!-- STAGE 1: the dramatic reveal -->
       <section class="reveal-stage reveal-stage--one" id="rs-one">
         <p class="reveal-preamble">
@@ -359,10 +362,18 @@ function renderResults({ iq, band, description, person, stats, source }) {
             <span class="reveal-preamble__dot"></span>
           </span>
         </p>
-        <div class="reveal-number" aria-live="polite">
+
+        <div class="reveal-number" id="reveal-number" aria-live="polite">
+          <!-- Concentric shockwave rings — expand outward when the number lands -->
+          <span class="reveal-ring" id="ring-1" aria-hidden="true"></span>
+          <span class="reveal-ring" id="ring-2" aria-hidden="true"></span>
+          <span class="reveal-ring" id="ring-3" aria-hidden="true"></span>
+          <!-- Particle burst container (spans injected on impact) -->
+          <span class="reveal-particles" id="particles" aria-hidden="true"></span>
           <span id="iq-value">0</span>
         </div>
-        <p class="reveal-band">${band}</p>
+
+        <p class="reveal-band"><span class="reveal-band__text">${band}</span></p>
         <button class="btn btn--primary reveal-btn" id="show-more">Show more</button>
       </section>
 
@@ -439,7 +450,9 @@ function transitionStage(outId, inId, onAfterIn) {
 }
 
 /* Aggressively-eased count-up: fast ramp, dramatic deceleration.
-   Uses easeOutQuint so the final 10 points feel like a slow-motion landing. */
+   Uses easeOutQuint so the final 10 points feel like a slow-motion landing.
+   When the count reaches the target we trigger the full impact sequence:
+   rings, particles, number punch, and a screen flash. */
 function dramaticCount(el, target, durationMs = 2000) {
   if (!el) return;
   const from  = 40;
@@ -450,8 +463,61 @@ function dramaticCount(el, target, durationMs = 2000) {
     const eased = 1 - Math.pow(1 - t, 5);
     el.textContent = Math.round(from + (target - from) * eased);
     if (t < 1) requestAnimationFrame(tick);
+    else       triggerImpact();
   }
   requestAnimationFrame(tick);
+}
+
+/* The "landing" moment — fired when the count-up hits its target. */
+function triggerImpact() {
+  const num   = document.getElementById("reveal-number");
+  const flash = document.getElementById("reveal-flash");
+  const parts = document.getElementById("particles");
+
+  /* 1. Number punch — spring-scale overshoot */
+  if (num) {
+    num.classList.remove("reveal-number--impact");
+    /* Force reflow so the animation restarts if previously triggered */
+    void num.offsetWidth;
+    num.classList.add("reveal-number--impact");
+  }
+
+  /* 2. Three shockwave rings — staggered */
+  ["ring-1", "ring-2", "ring-3"].forEach((id, i) => {
+    const r = document.getElementById(id);
+    if (!r) return;
+    setTimeout(() => {
+      r.classList.remove("reveal-ring--burst");
+      void r.offsetWidth;
+      r.classList.add("reveal-ring--burst");
+    }, i * 140);
+  });
+
+  /* 3. Particle burst — spawn 16 radial particles */
+  if (parts) {
+    parts.innerHTML = "";
+    const N = 16;
+    for (let i = 0; i < N; i++) {
+      const p = document.createElement("span");
+      const angle    = (i / N) * 360 + (Math.random() * 22 - 11);
+      const distance = 120 + Math.random() * 110;
+      const delay    = Math.random() * 80;
+      p.style.setProperty("--angle",    `${angle}deg`);
+      p.style.setProperty("--distance", `${distance}px`);
+      p.style.animationDelay = `${delay}ms`;
+      parts.appendChild(p);
+    }
+    parts.classList.remove("reveal-particles--burst");
+    void parts.offsetWidth;
+    parts.classList.add("reveal-particles--burst");
+  }
+
+  /* 4. Screen-wide flash */
+  if (flash) {
+    flash.classList.remove("reveal-flash--burst");
+    void flash.offsetWidth;
+    flash.classList.add("reveal-flash--burst");
+  }
 }
 
 function animateCountTo(el, from, target, durationMs) {

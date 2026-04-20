@@ -2188,6 +2188,105 @@
   opacity: 0;
   animation: number-in 900ms var(--ease-out) 1750ms forwards;
   filter: drop-shadow(0 8px 80px rgba(196, 121, 90, 0.32));
+  /* Must be positioned so the absolutely-positioned effect children
+     (rings, particles, flash origin) center on the number. */
+  display: inline-block;
+  transform-origin: center center;
+}
+
+/* Number "punch" on impact — overshoot + glow spike. Spring curve. */
+.reveal-number--impact {
+  animation: number-punch 900ms cubic-bezier(0.22, 1.4, 0.36, 1) forwards;
+}
+@keyframes number-punch {
+  0%   { transform: scale(1);    filter: drop-shadow(0 8px 80px  rgba(196, 121, 90, 0.32)); }
+  25%  { transform: scale(1.14); filter: drop-shadow(0 10px 160px rgba(196, 121, 90, 0.95)); }
+  55%  { transform: scale(0.97); filter: drop-shadow(0 8px 100px rgba(196, 121, 90, 0.55)); }
+  100% { transform: scale(1);    filter: drop-shadow(0 8px 90px  rgba(196, 121, 90, 0.5)); }
+}
+
+/* ─── Shockwave rings ─── */
+.reveal-ring {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 2px solid var(--accent);
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, -50%) scale(1);
+  z-index: 1;
+}
+.reveal-ring--burst {
+  animation: ring-expand 1.4s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+@keyframes ring-expand {
+  0%   { opacity: 0.95; transform: translate(-50%, -50%) scale(0.3);  border-width: 3px; }
+  20%  { opacity: 1;    transform: translate(-50%, -50%) scale(1.0);  border-width: 2.5px; }
+  100% { opacity: 0;    transform: translate(-50%, -50%) scale(9);    border-width: 0.5px; }
+}
+
+/* ─── Particle burst ─── */
+.reveal-particles {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+  z-index: 2;
+}
+.reveal-particles span {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 14px rgba(196, 121, 90, 0.9);
+  opacity: 0;
+  transform: translate(-50%, -50%);
+  will-change: transform, opacity;
+}
+.reveal-particles--burst span {
+  animation: particle-fly 1.3s cubic-bezier(0.16, 0.8, 0.22, 1) forwards;
+}
+@keyframes particle-fly {
+  0%   { opacity: 0; transform: translate(-50%, -50%) rotate(var(--angle, 0deg)) translateY(0) scale(0); }
+  15%  { opacity: 1; transform: translate(-50%, -50%) rotate(var(--angle, 0deg)) translateY(-16px) scale(1.4); }
+  100% { opacity: 0; transform: translate(-50%, -50%) rotate(var(--angle, 0deg)) translateY(calc(-1 * var(--distance, 180px))) scale(0.35); }
+}
+
+/* ─── Full-viewport flash ─── */
+.reveal-flash {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 20;
+  opacity: 0;
+  background:
+    radial-gradient(circle at center,
+      rgba(196, 121, 90, 0.30) 0%,
+      rgba(196, 121, 90, 0.08) 30%,
+      transparent 60%);
+}
+.reveal-flash--burst {
+  animation: flash-burst 1100ms cubic-bezier(0.16, 0.8, 0.22, 1);
+}
+@keyframes flash-burst {
+  0%   { opacity: 0;    transform: scale(0.75); }
+  18%  { opacity: 1;    transform: scale(1.1);  }
+  100% { opacity: 0;    transform: scale(1.8);  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal-number--impact,
+  .reveal-ring--burst,
+  .reveal-particles--burst span,
+  .reveal-flash--burst { animation: none !important; }
 }
 .reveal-number #iq-value {
   font-variant-numeric: tabular-nums;
@@ -2230,17 +2329,42 @@
   to   { opacity: 1; transform: translateY(0); }
 }
 
-/* Band name — arrives after the number has finished counting */
+/* Band name — arrives after the number has finished counting.
+   Text collapses its letter-spacing (from wide-spaced → tight) for a
+   "locking in" feel, then an accent underline sweeps in beneath it. */
 .reveal-band {
   font-family: var(--font-display);
   font-size: var(--fs-xl);
   font-weight: 500;
   color: var(--text);
-  letter-spacing: -0.03em;
   line-height: 1;
   margin: 0;
+  position: relative;
+  padding-bottom: 14px;
+}
+.reveal-band__text {
+  display: inline-block;
   opacity: 0;
-  animation: fade-up 700ms var(--ease-out) 4050ms forwards;
+  letter-spacing: 0.35em;
+  transform: translateY(16px);
+  animation: band-text-in 900ms cubic-bezier(0.22, 1, 0.36, 1) 4050ms forwards;
+}
+.reveal-band::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--accent), transparent);
+  transform: translateX(-50%);
+  animation: band-underline 800ms cubic-bezier(0.22, 1, 0.36, 1) 4500ms forwards;
+}
+@keyframes band-text-in {
+  to { opacity: 1; letter-spacing: -0.03em; transform: translateY(0); }
+}
+@keyframes band-underline {
+  to { width: 140px; }
 }
 
 .reveal-btn {
