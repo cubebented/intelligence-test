@@ -18,19 +18,17 @@ const _v = new URL(import.meta.url).searchParams.get("v") || "";
 const _q = _v ? `?v=${_v}` : "";
 
 const [
-  series, analogy, oddOne, folding, sequence, cubeNet,
-  matrix, hiddenFigure, memoryGrid, memorySequence, memoryPath,
+  series, analogy, oddOne, sequence, cubeNet,
+  matrix, memoryGrid, memorySequence, memoryPath,
   logicPuzzle, verbalAnalogy,
   coding, deduction, relationship, numberSentence, anagram,
 ] = await Promise.all([
   import("./series.js"           + _q),
   import("./analogy.js"          + _q),
   import("./odd-one.js"          + _q),
-  import("./folding.js"          + _q),
   import("./sequence.js"         + _q),
   import("./cube-net.js"         + _q),
   import("./matrix.js"           + _q),
-  import("./hidden-figure.js"    + _q),
   import("./memory-grid.js"      + _q),
   import("./memory-sequence.js"  + _q),
   import("./memory-path.js"      + _q),
@@ -52,10 +50,8 @@ export const TYPES = [
   { id: "analogy",           label: "Figure Analogy",   timeLimit: 25,  generate: analogy.generate        },
   { id: "matrix",            label: "Matrix Reasoning", timeLimit: 30,  generate: matrix.generate         },
   { id: "odd-one",           label: "Odd One Out",      timeLimit: 18,  generate: oddOne.generate         },
-  { id: "folding",           label: "Paper Folding",    timeLimit: 28,  generate: folding.generate        },
-  { id: "sequence",          label: "Pattern Sequence", timeLimit: 35,  generate: sequence.generate       },
+  { id: "sequence",          label: "Pattern Sequence", timeLimit: 40,  generate: sequence.generate       },
   { id: "cube-net",          label: "Cube Net",         timeLimit: 28,  generate: cubeNet.generate        },
-  { id: "hidden-figure",     label: "Hidden Figure",    timeLimit: 20,  generate: hiddenFigure.generate   },
   /* — Memory — */
   { id: "memory-grid",       label: "Memory Grid",      timeLimit: 22,  generate: memoryGrid.generate     },
   { id: "memory-sequence",   label: "Memory Sequence",  timeLimit: 22,  generate: memorySequence.generate },

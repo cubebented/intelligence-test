@@ -76,6 +76,76 @@ const TEMPLATES = [
       return { seq, next: b + 2 * db, rule: "two interleaved series" };
     },
   },
+  /* Countdown arithmetic */
+  {
+    build(rng) {
+      const a = rng.int(60, 150);
+      const d = rng.int(3, 9);
+      const seq = [0, 1, 2, 3, 4].map(i => a - i * d);
+      return { seq, next: a - 5 * d, rule: `-${d} each step` };
+    },
+  },
+  /* Multiplication by variable r */
+  {
+    build(rng) {
+      const a = rng.int(1, 4);
+      const r = rng.pick([2, 3, 4]);
+      const seq = [0, 1, 2, 3].map(i => a * Math.pow(r, i));
+      return { seq, next: a * Math.pow(r, 4), rule: `×${r} each step` };
+    },
+  },
+  /* Cubes: 1, 8, 27, 64, 125 */
+  {
+    build(rng) {
+      const c = rng.int(0, 3);
+      const seq = [1, 2, 3, 4, 5].map(n => n * n * n + c);
+      return { seq, next: 216 + c, rule: `n³ + ${c}` };
+    },
+  },
+  /* Primes (first 8) */
+  {
+    build(rng) {
+      const primes = [2, 3, 5, 7, 11, 13, 17, 19, 23];
+      const start  = rng.int(0, 3);
+      const seq    = primes.slice(start, start + 5);
+      return { seq, next: primes[start + 5], rule: "prime numbers" };
+    },
+  },
+  /* Running total of naturals: 1, 3, 6, 10, 15 (triangular again but framed) */
+  {
+    build(rng) {
+      const seq = [1, 3, 6, 10, 15];
+      return { seq, next: 21, rule: "sum of first n naturals" };
+    },
+  },
+  /* x² − x (or x² + x) — quadratic-ish */
+  {
+    build(rng) {
+      const sign = rng.bool() ? 1 : -1;
+      const c    = rng.int(0, 3);
+      const seq  = [1, 2, 3, 4, 5].map(n => n * n + sign * n + c);
+      return { seq, next: 36 + sign * 6 + c, rule: `n² ${sign > 0 ? "+" : "-"} n ${c ? `+ ${c}` : ""}` };
+    },
+  },
+  /* Doubling and adding */
+  {
+    build(rng) {
+      const a = rng.int(1, 4);
+      const add = rng.int(1, 4);
+      const seq = [a];
+      for (let i = 0; i < 4; i++) seq.push(seq[i] * 2 + add);
+      return { seq, next: seq[4] * 2 + add, rule: `×2 + ${add}` };
+    },
+  },
+  /* Square-then-halve irregular */
+  {
+    build(rng) {
+      /* 2, 6, 12, 20, 30 → n(n+1) */
+      const c = rng.int(0, 3);
+      const seq = [1, 2, 3, 4, 5].map(n => n * (n + 1) + c);
+      return { seq, next: 6 * 7 + c, rule: "n(n+1) + c" };
+    },
+  },
 ];
 
 export function generate(rng) {
@@ -97,6 +167,7 @@ export function generate(rng) {
           <input type="number" inputmode="numeric" class="input input--number" id="series-input" placeholder="___" autocomplete="off" />
           <p class="eyebrow" style="text-align:center;margin-top:var(--s-2);">Press Enter to submit</p>
         </div>
+        ${calculatorHtml()}
       `;
     },
 
@@ -114,6 +185,7 @@ export function generate(rng) {
       inp.addEventListener("keydown", (e) => {
         if (e.key === "Enter") commit();
       });
+      wireCalculator(root);
     },
 
     restore(root, { answer: savedAnswer } = {}) {
@@ -130,4 +202,109 @@ export function generate(rng) {
     evaluate: (a) => Number(a) === next,
     correctAnswer: () => next,
   };
+}
+
+/* ─── Draggable calculator widget ─────────────────────────────────
+   Rendered inline with the question; user can grab the header bar
+   to move it anywhere on screen. Buttons drive a tiny expression
+   evaluator — safely scoped to only digits + 4 operators + parens.  */
+
+function calculatorHtml() {
+  return `
+    <div class="calc" id="calc">
+      <div class="calc__bar" id="calc-bar">
+        <span class="calc__label">CALCULATOR</span>
+        <span class="calc__hint">drag to move</span>
+      </div>
+      <div class="calc__display" id="calc-display">0</div>
+      <div class="calc__keys">
+        <button type="button" class="calc__key calc__key--fn" data-k="C">C</button>
+        <button type="button" class="calc__key calc__key--fn" data-k="←">←</button>
+        <button type="button" class="calc__key calc__key--op" data-k="(">(</button>
+        <button type="button" class="calc__key calc__key--op" data-k=")">)</button>
+        <button type="button" class="calc__key" data-k="7">7</button>
+        <button type="button" class="calc__key" data-k="8">8</button>
+        <button type="button" class="calc__key" data-k="9">9</button>
+        <button type="button" class="calc__key calc__key--op" data-k="/">÷</button>
+        <button type="button" class="calc__key" data-k="4">4</button>
+        <button type="button" class="calc__key" data-k="5">5</button>
+        <button type="button" class="calc__key" data-k="6">6</button>
+        <button type="button" class="calc__key calc__key--op" data-k="*">×</button>
+        <button type="button" class="calc__key" data-k="1">1</button>
+        <button type="button" class="calc__key" data-k="2">2</button>
+        <button type="button" class="calc__key" data-k="3">3</button>
+        <button type="button" class="calc__key calc__key--op" data-k="-">−</button>
+        <button type="button" class="calc__key" data-k="0">0</button>
+        <button type="button" class="calc__key" data-k=".">.</button>
+        <button type="button" class="calc__key calc__key--eq" data-k="=">=</button>
+        <button type="button" class="calc__key calc__key--op" data-k="+">+</button>
+      </div>
+    </div>
+  `;
+}
+
+function wireCalculator(root) {
+  const calc    = root.querySelector("#calc");
+  const display = root.querySelector("#calc-display");
+  const bar     = root.querySelector("#calc-bar");
+  if (!calc || !display || !bar) return;
+
+  /* Expression editor — stores the literal string we show */
+  let expr = "";
+
+  const refresh = () => { display.textContent = expr || "0"; };
+
+  const press = (k) => {
+    if (k === "C") { expr = ""; refresh(); return; }
+    if (k === "←") { expr = expr.slice(0, -1); refresh(); return; }
+    if (k === "=") {
+      try {
+        /* Only allow digits, operators, decimal, parens, spaces.
+           Anything else = reject. This is a deliberately tight sandbox. */
+        if (!/^[0-9+\-*/().\s]*$/.test(expr)) { display.textContent = "ERROR"; return; }
+        // eslint-disable-next-line no-new-func
+        const val = Function(`"use strict"; return (${expr || 0});`)();
+        if (!Number.isFinite(val)) { display.textContent = "ERROR"; return; }
+        /* Round to 6 decimals, strip trailing zeroes */
+        expr = (Math.round(val * 1e6) / 1e6).toString();
+        refresh();
+      } catch {
+        display.textContent = "ERROR";
+      }
+      return;
+    }
+    expr += k;
+    refresh();
+  };
+
+  calc.querySelectorAll(".calc__key").forEach(btn => {
+    btn.addEventListener("click", () => press(btn.dataset.k));
+  });
+
+  /* Drag via the header bar. Pointer events so it works on trackpads
+     and touch screens alike. */
+  let dragging = false;
+  let dx = 0, dy = 0;
+  bar.addEventListener("pointerdown", (e) => {
+    dragging = true;
+    const rect = calc.getBoundingClientRect();
+    dx = e.clientX - rect.left;
+    dy = e.clientY - rect.top;
+    calc.classList.add("calc--dragging");
+    bar.setPointerCapture(e.pointerId);
+  });
+  bar.addEventListener("pointermove", (e) => {
+    if (!dragging) return;
+    const x = e.clientX - dx;
+    const y = e.clientY - dy;
+    calc.style.left   = `${Math.max(8, Math.min(window.innerWidth  - calc.offsetWidth  - 8, x))}px`;
+    calc.style.top    = `${Math.max(8, Math.min(window.innerHeight - calc.offsetHeight - 8, y))}px`;
+    calc.style.right  = "auto";
+    calc.style.bottom = "auto";
+  });
+  bar.addEventListener("pointerup", (e) => {
+    dragging = false;
+    calc.classList.remove("calc--dragging");
+    bar.releasePointerCapture(e.pointerId);
+  });
 }

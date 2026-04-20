@@ -74,6 +74,70 @@ const PATTERNS = [
       return s;
     },
   },
+  /* Checkerboard growing — cells at (c+r) even, within an n×n square */
+  {
+    name: "checkerboard",
+    build: (n) => {
+      const s = new Set();
+      for (let c = 0; c < n; c++)
+        for (let r = 0; r < n; r++)
+          if ((c + r) % 2 === 0) s.add(`${c},${GRID - 1 - r}`);
+      return s;
+    },
+  },
+  /* X pattern — two diagonals in an n×n square */
+  {
+    name: "X-cross",
+    build: (n) => {
+      const s = new Set();
+      for (let i = 0; i < n; i++) {
+        s.add(`${i},${GRID - 1 - i}`);         /* ↘ */
+        s.add(`${n - 1 - i},${GRID - 1 - i}`); /* ↙ */
+      }
+      return s;
+    },
+  },
+  /* Staircase — filling bottom row, then second-from-bottom partial, etc. */
+  {
+    name: "staircase",
+    build: (n) => {
+      const s = new Set();
+      for (let r = 0; r < n; r++)
+        for (let c = 0; c <= r; c++)
+          s.add(`${c},${GRID - 1 - r}`);
+      return s;
+    },
+  },
+  /* Hollow square — n×n outline */
+  {
+    name: "hollow square",
+    build: (n) => {
+      const s = new Set();
+      if (n === 1) { s.add(`0,${GRID - 1}`); return s; }
+      for (let i = 0; i < n; i++) {
+        s.add(`${i},${GRID - 1}`);          /* bottom */
+        s.add(`${i},${GRID - n}`);          /* top */
+        s.add(`0,${GRID - 1 - i}`);         /* left */
+        s.add(`${n - 1},${GRID - 1 - i}`);  /* right */
+      }
+      return s;
+    },
+  },
+  /* Spiral — outside-in rotation */
+  {
+    name: "zigzag",
+    build: (n) => {
+      /* row by row, alternating direction — snake pattern */
+      const s = new Set();
+      for (let r = 0; r < n; r++) {
+        for (let c = 0; c < n; c++) {
+          const cc = (r % 2 === 0) ? c : (n - 1 - c);
+          if (cc < r + 1) s.add(`${cc},${GRID - 1 - r}`);
+        }
+      }
+      return s;
+    },
+  },
 ];
 
 /* Render a small static pattern into a 6x6 dot grid SVG for EXAMPLES. */

@@ -340,43 +340,94 @@ function renderResults({ iq, band, description, person, stats, source }) {
   const esc = (s) => String(s ?? "")
     .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
+  /* Staged reveal:
+     Stage 1 — just the IQ + band + [Show More]
+     Stage 2 — adds big stats + [Next]
+     Stage 3 — adds celebrity card + retake button */
   root.innerHTML = `
     <article class="results-simple">
-      <p class="results-simple__eyebrow reveal" style="--i:0">Your approximate IQ</p>
-
-      <div class="results-simple__num reveal" style="--i:1">
-        <span class="results-simple__tilde">~</span><span id="iq-value">${iq}</span>
+      <!-- STAGE 1: the number -->
+      <div class="rs-stage rs-stage--1 reveal" style="--i:0">
+        <div class="results-simple__num">
+          <span id="iq-value">${iq}</span><span class="results-simple__suffix">IQ</span>
+        </div>
+        <p class="results-simple__band">${band}</p>
+        <button class="btn btn--primary rs-more" id="show-more">Show more</button>
       </div>
 
-      <p class="results-simple__band reveal" style="--i:2">${band}</p>
-
-      <p class="results-simple__desc reveal" style="--i:3">${esc(description)}</p>
-
-      <div class="results-simple__people reveal" style="--i:4">
-        <span class="results-simple__people-label">At your level</span>
-        <span class="results-simple__people-name">${esc(person.name)}</span>
-        <span class="results-simple__people-iq">Reported IQ · ${person.iq}</span>
+      <!-- STAGE 2: big stats (hidden until Show More) -->
+      <div class="rs-stage rs-stage--2" id="rs-stats" hidden>
+        <div class="rs-stats-grid">
+          <div class="rs-stat">
+            <span class="rs-stat__n" id="stat-correct">${stats.correctCount}</span>
+            <span class="rs-stat__d">/ ${stats.total}</span>
+            <span class="rs-stat__l">correct</span>
+          </div>
+          <div class="rs-stat">
+            <span class="rs-stat__n" id="stat-pct">${stats.pct}</span>
+            <span class="rs-stat__d">%</span>
+            <span class="rs-stat__l">accuracy</span>
+          </div>
+          <div class="rs-stat">
+            <span class="rs-stat__n" id="stat-time">${formatDuration(stats.totalMs)}</span>
+            <span class="rs-stat__l">total time</span>
+          </div>
+        </div>
+        <p class="results-simple__desc">${esc(description)}</p>
+        <button class="btn btn--primary rs-more" id="show-person">Next</button>
       </div>
 
-      <div class="results-simple__stats reveal" style="--i:5">
-        <span>${stats.correctCount}/${stats.total} correct</span>
-        <span class="dot">·</span>
-        <span>${formatDuration(stats.totalMs)}</span>
-        <span class="dot">·</span>
-        <span>${stats.pct}% accuracy</span>
+      <!-- STAGE 3: celebrity reveal -->
+      <div class="rs-stage rs-stage--3" id="rs-person" hidden>
+        <div class="results-simple__people">
+          <span class="results-simple__people-label">At your level</span>
+          <span class="results-simple__people-name">${esc(person.name)}</span>
+          <span class="results-simple__people-iq">Reported IQ · ${person.iq}</span>
+        </div>
+        <a class="btn btn--ghost" href="index.html">Take it again</a>
       </div>
 
-      <div class="results-simple__actions reveal" style="--i:6">
-        <a class="btn btn--primary" href="index.html">Take it again</a>
-      </div>
-
-      <p class="results-simple__note reveal" style="--i:7">
+      <p class="results-simple__note">
         Rounded to the nearest 5. Approximation only — not a clinical score.
       </p>
     </article>
   `;
 
   animateCount(document.getElementById("iq-value"), iq);
+
+  document.getElementById("show-more")?.addEventListener("click", () => {
+    revealStage("rs-stats");
+    document.getElementById("show-more").remove();
+    /* Animate-count the big stats too, so they feel alive */
+    animateCountTo(document.getElementById("stat-correct"), 0, stats.correctCount, 1100);
+    animateCountTo(document.getElementById("stat-pct"),     0, stats.pct,          1100);
+  });
+
+  document.getElementById("show-person")?.addEventListener("click", () => {
+    revealStage("rs-person");
+    document.getElementById("show-person").remove();
+  });
+}
+
+/* Smoothly un-hide + fade/slide in a stage */
+function revealStage(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.hidden = false;
+  requestAnimationFrame(() => el.classList.add("rs-stage--in"));
+}
+
+function animateCountTo(el, from, target, durationMs) {
+  if (!el) return;
+  const start = performance.now();
+  el.textContent = from;
+  function tick(now) {
+    const t     = Math.min(1, (now - start) / durationMs);
+    const eased = t === 1 ? 1 : 1 - Math.pow(2, -10 * t);
+    el.textContent = Math.round(from + (target - from) * eased);
+    if (t < 1) requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
 }
 
 function formatDuration(ms) {

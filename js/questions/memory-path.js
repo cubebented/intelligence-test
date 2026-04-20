@@ -35,24 +35,47 @@ export function generate(rng) {
         for (let c = 0; c < GRID; c++)
           nodes += `<button type="button" class="mem-node" data-key="${keyOf(c, r)}" tabindex="-1"></button>`;
 
+      /* Static preview — 4 dot positions at random so the user knows what
+         "dots light up in sequence" will actually look like. */
+      const previewNodes = [
+        `<button class="mem-node mem-node--flash" disabled></button>`,
+        `<button class="mem-node" disabled></button>`,
+        `<button class="mem-node mem-node--flash" disabled></button>`,
+        `<button class="mem-node" disabled></button>`,
+      ].join("");
+
       return `
         <div class="mem-wrap">
           <div class="mem-phase mem-phase--study" id="mem-phase">
-            <span class="mem-phase__label">WATCH</span>
-            <span class="mem-phase__n" id="mem-phase-n">${PATH_LEN} steps</span>
+            <span class="mem-phase__label" id="mem-phase-label">READY</span>
+            <span class="mem-phase__n" id="mem-phase-n">${PATH_LEN} dots flash — in order</span>
           </div>
-          <div class="mem-path-grid" id="mem-path-grid" style="--g:${GRID}">${nodes}</div>
-          <p class="mem-count" id="mem-count">
+
+          <div class="mem-preview" id="mem-preview">
+            <p class="mem-preview__hint">Dots like these will light up one at a time. Remember the order.</p>
+            <div class="mem-preview__grid mem-preview__grid--path">${previewNodes}</div>
+            <div class="mem-countdown" id="mem-countdown">
+              <span class="mem-countdown__num" id="mem-countdown-num">3</span>
+              <span class="mem-countdown__label">starting in</span>
+            </div>
+          </div>
+
+          <div class="mem-path-grid" id="mem-path-grid" style="--g:${GRID}; display:none">${nodes}</div>
+          <p class="mem-count" id="mem-count" style="visibility:hidden">
             <span id="mem-count-num">0</span> / ${PATH_LEN} tapped
           </p>
         </div>`;
     },
 
     attach(root, onAnswer) {
-      const grid    = root.querySelector("#mem-path-grid");
-      const phaseEl = root.querySelector("#mem-phase");
-      const countEl = root.querySelector("#mem-count-num");
+      const grid      = root.querySelector("#mem-path-grid");
+      const phaseEl   = root.querySelector("#mem-phase");
+      const phaseLbl  = root.querySelector("#mem-phase-label");
+      const phaseN    = root.querySelector("#mem-phase-n");
+      const countEl   = root.querySelector("#mem-count-num");
       const countWrap = root.querySelector("#mem-count");
+      const previewEl = root.querySelector("#mem-preview");
+      const cdNum     = root.querySelector("#mem-countdown-num");
 
       const flashNode = (key) => {
         const node = grid.querySelector(`.mem-node[data-key="${key}"]`);
@@ -61,65 +84,89 @@ export function generate(rng) {
         timers.push(setTimeout(() => node.classList.remove("mem-node--flash"), FLASH_MS));
       };
 
-      /* Schedule sequential flashes */
-      targetSeq.forEach((k, i) => {
-        timers.push(setTimeout(() => flashNode(k), i * (FLASH_MS + GAP_MS)));
-      });
+      const startSequence = () => {
+        previewEl.style.display = "none";
+        grid.style.display = "";
+        countWrap.style.visibility = "visible";
+        phaseLbl.textContent = "WATCH";
+        phaseN.textContent   = `${PATH_LEN} dots in order`;
 
-      const totalStudyMs = targetSeq.length * (FLASH_MS + GAP_MS) + HOLD_MS;
-      timers.push(setTimeout(() => {
-        phase = "recall";
-        phaseEl.classList.remove("mem-phase--study");
-        phaseEl.classList.add("mem-phase--recall");
-        phaseEl.querySelector(".mem-phase__label").textContent = "RECALL";
-        phaseEl.querySelector(".mem-phase__n").textContent     = "tap in order";
+        targetSeq.forEach((k, i) => {
+          timers.push(setTimeout(() => flashNode(k), i * (FLASH_MS + GAP_MS)));
+        });
 
-        grid.querySelectorAll(".mem-node").forEach(node => {
-          node.addEventListener("click", () => {
-            if (picked.length >= PATH_LEN) return;
-            const k = node.dataset.key;
-            picked.push(k);
-            node.classList.add("mem-node--picked");
-            /* Show the order number inside the node */
-            const span = document.createElement("span");
-            span.className = "mem-node__order";
-            span.textContent = picked.length;
-            node.appendChild(span);
+        const totalStudyMs = targetSeq.length * (FLASH_MS + GAP_MS) + HOLD_MS;
+        timers.push(setTimeout(() => {
+          phase = "recall";
+          phaseEl.classList.remove("mem-phase--study");
+          phaseEl.classList.add("mem-phase--recall");
+          phaseLbl.textContent = "RECALL";
+          phaseN.textContent   = "tap in order";
 
-            countEl.textContent = picked.length;
+          grid.querySelectorAll(".mem-node").forEach(node => {
+            node.addEventListener("click", () => {
+              if (picked.length >= PATH_LEN) return;
+              const k = node.dataset.key;
+              picked.push(k);
+              node.classList.add("mem-node--picked");
+              const span = document.createElement("span");
+              span.className = "mem-node__order";
+              span.textContent = picked.length;
+              node.appendChild(span);
 
-            if (picked.length === PATH_LEN) {
-              onAnswer(picked.join("|"));
-            } else {
-              onAnswer(null);
+              countEl.textContent = picked.length;
+
+              if (picked.length === PATH_LEN) onAnswer(picked.join("|"));
+              else                            onAnswer(null);
+            });
+          });
+
+          /* Double-click last picked node to pop it */
+          grid.addEventListener("dblclick", (e) => {
+            const node = e.target.closest(".mem-node");
+            if (!node) return;
+            const last = picked[picked.length - 1];
+            if (node.dataset.key === last) {
+              picked.pop();
+              node.classList.remove("mem-node--picked");
+              const span = node.querySelector(".mem-node__order");
+              if (span) span.remove();
+              countEl.textContent = picked.length;
+              onAnswer(picked.length === PATH_LEN ? picked.join("|") : null);
             }
           });
-        });
+        }, totalStudyMs));
+      };
 
-        /* Tiny reset affordance — long-press clears; keep simple: double-click a picked node to pop it */
-        grid.addEventListener("dblclick", (e) => {
-          const node = e.target.closest(".mem-node");
-          if (!node) return;
-          const last = picked[picked.length - 1];
-          if (node.dataset.key === last) {
-            picked.pop();
-            node.classList.remove("mem-node--picked");
-            const span = node.querySelector(".mem-node__order");
-            if (span) span.remove();
-            countEl.textContent = picked.length;
-            onAnswer(picked.length === PATH_LEN ? picked.join("|") : null);
-          }
-        });
-      }, totalStudyMs));
+      /* 3-2-1 countdown before the real sequence runs */
+      let n = 3;
+      cdNum.textContent = n;
+      const tick = () => {
+        n -= 1;
+        if (n <= 0) {
+          startSequence();
+        } else {
+          cdNum.textContent = n;
+          timers.push(setTimeout(tick, 1000));
+        }
+      };
+      timers.push(setTimeout(tick, 1000));
     },
 
     restore(root, { answer: savedAnswer } = {}) {
       clearTimers();
       phase = "done";
 
-      const grid    = root.querySelector("#mem-path-grid");
-      const phaseEl = root.querySelector("#mem-phase");
-      const countEl = root.querySelector("#mem-count-num");
+      const grid      = root.querySelector("#mem-path-grid");
+      const phaseEl   = root.querySelector("#mem-phase");
+      const countEl   = root.querySelector("#mem-count-num");
+      const previewEl = root.querySelector("#mem-preview");
+      const countWrap = root.querySelector("#mem-count");
+
+      /* Show the real grid, hide the preview/countdown */
+      if (previewEl) previewEl.style.display = "none";
+      if (grid)      grid.style.display = "";
+      if (countWrap) countWrap.style.visibility = "visible";
 
       if (phaseEl) {
         phaseEl.classList.remove("mem-phase--study");

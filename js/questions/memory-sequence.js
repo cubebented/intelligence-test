@@ -50,6 +50,12 @@ export function generate(rng) {
          </div>`
       ).join("");
 
+      /* Static preview — three example shapes showing what WILL flash.
+         Makes the upcoming task easier to orient to. */
+      const previewShapes = reel.slice(0, 3)
+        .map(s => `<div class="mem-preview__slot">${shapeSvg(s, { accent: true })}</div>`)
+        .join("");
+
       const opts = options.map((sh, i) =>
         `<button type="button" class="option reveal" style="--i:${i}" data-idx="${i}">
           <span class="option__label">${String.fromCharCode(65 + i)}</span>
@@ -60,10 +66,23 @@ export function generate(rng) {
       return `
         <div class="mem-wrap">
           <div class="mem-phase mem-phase--study" id="mem-phase">
-            <span class="mem-phase__label">WATCH</span>
-            <span class="mem-phase__n" id="mem-phase-n">pos ${askIndex + 1} of ${SHAPE_CAP}</span>
+            <span class="mem-phase__label" id="mem-phase-label">READY</span>
+            <span class="mem-phase__n" id="mem-phase-n">shapes flash in sequence</span>
           </div>
-          <div class="mem-reel" id="mem-reel">${slots}</div>
+
+          <!-- READY phase: preview + countdown (hidden once sequence starts) -->
+          <div class="mem-preview" id="mem-preview">
+            <p class="mem-preview__hint">Shapes like these will flash — each for ~½&nbsp;second.</p>
+            <div class="mem-preview__row">${previewShapes}</div>
+            <div class="mem-countdown" id="mem-countdown">
+              <span class="mem-countdown__num" id="mem-countdown-num">3</span>
+              <span class="mem-countdown__label">starting in</span>
+            </div>
+          </div>
+
+          <!-- The real reel (hidden until countdown finishes) -->
+          <div class="mem-reel" id="mem-reel" style="display:none">${slots}</div>
+
           <p class="mem-question" id="mem-question" style="visibility:hidden">
             Which shape was in position <strong>${askIndex + 1}</strong>?
           </p>
@@ -72,10 +91,14 @@ export function generate(rng) {
     },
 
     attach(root, onAnswer) {
-      const reelEl   = root.querySelector("#mem-reel");
-      const phaseEl  = root.querySelector("#mem-phase");
-      const qEl      = root.querySelector("#mem-question");
-      const optsWrap = root.querySelector("#mem-options");
+      const reelEl    = root.querySelector("#mem-reel");
+      const phaseEl   = root.querySelector("#mem-phase");
+      const phaseLbl  = root.querySelector("#mem-phase-label");
+      const phaseN    = root.querySelector("#mem-phase-n");
+      const qEl       = root.querySelector("#mem-question");
+      const optsWrap  = root.querySelector("#mem-options");
+      const previewEl = root.querySelector("#mem-preview");
+      const cdNum     = root.querySelector("#mem-countdown-num");
 
       const flashSlot = (i) => {
         const slot = reelEl.querySelector(`[data-i="${i}"]`);
@@ -84,47 +107,74 @@ export function generate(rng) {
         slot.classList.add("mem-reel__slot--on");
         timers.push(setTimeout(() => {
           slot.classList.remove("mem-reel__slot--on");
-          /* Restore the position-number placeholder after the flash */
           slot.innerHTML = `<span class="mem-reel__placeholder">${i + 1}</span>`;
         }, FLASH_MS));
       };
 
-      /* Schedule flashes */
-      reel.forEach((_, i) => {
-        timers.push(setTimeout(() => flashSlot(i), i * (FLASH_MS + GAP_MS)));
-      });
+      /* Countdown 3 → 2 → 1 → GO, then flash the real sequence */
+      const startSequence = () => {
+        /* Hide preview, reveal reel */
+        previewEl.style.display = "none";
+        reelEl.style.display = "";
+        phaseLbl.textContent = "WATCH";
+        phaseN.textContent   = `${SHAPE_CAP} shapes — one by one`;
 
-      /* After last flash → show question */
-      const totalStudyMs = reel.length * (FLASH_MS + GAP_MS) + HOLD_MS;
-      timers.push(setTimeout(() => {
-        phase = "recall";
-        phaseEl.classList.remove("mem-phase--study");
-        phaseEl.classList.add("mem-phase--recall");
-        phaseEl.querySelector(".mem-phase__label").textContent = "RECALL";
-        phaseEl.querySelector(".mem-phase__n").textContent     = "pick the shape";
-        qEl.style.visibility = "visible";
-        optsWrap.style.visibility = "visible";
-        optsWrap.style.pointerEvents = "auto";
-
-        optsWrap.querySelectorAll(".option").forEach(btn => {
-          btn.addEventListener("click", () => {
-            optsWrap.querySelectorAll(".option").forEach(b => b.classList.remove("option--selected"));
-            btn.classList.add("option--selected");
-            answer = Number(btn.dataset.idx);
-            onAnswer(answer);
-          });
+        /* Schedule flashes */
+        reel.forEach((_, i) => {
+          timers.push(setTimeout(() => flashSlot(i), i * (FLASH_MS + GAP_MS)));
         });
-      }, totalStudyMs));
+
+        /* After last flash → show question */
+        const totalStudyMs = reel.length * (FLASH_MS + GAP_MS) + HOLD_MS;
+        timers.push(setTimeout(() => {
+          phase = "recall";
+          phaseEl.classList.remove("mem-phase--study");
+          phaseEl.classList.add("mem-phase--recall");
+          phaseLbl.textContent = "RECALL";
+          phaseN.textContent   = "pick the shape";
+          qEl.style.visibility = "visible";
+          optsWrap.style.visibility = "visible";
+          optsWrap.style.pointerEvents = "auto";
+
+          optsWrap.querySelectorAll(".option").forEach(btn => {
+            btn.addEventListener("click", () => {
+              optsWrap.querySelectorAll(".option").forEach(b => b.classList.remove("option--selected"));
+              btn.classList.add("option--selected");
+              answer = Number(btn.dataset.idx);
+              onAnswer(answer);
+            });
+          });
+        }, totalStudyMs));
+      };
+
+      /* 3 → 2 → 1 countdown (1 second per tick) */
+      let n = 3;
+      cdNum.textContent = n;
+      const tick = () => {
+        n -= 1;
+        if (n <= 0) {
+          startSequence();
+        } else {
+          cdNum.textContent = n;
+          timers.push(setTimeout(tick, 1000));
+        }
+      };
+      timers.push(setTimeout(tick, 1000));
     },
 
     restore(root, { answer: savedAnswer } = {}) {
       clearTimers();
       phase = "done";
 
-      const phaseEl  = root.querySelector("#mem-phase");
-      const qEl      = root.querySelector("#mem-question");
-      const optsWrap = root.querySelector("#mem-options");
-      const reelEl   = root.querySelector("#mem-reel");
+      const phaseEl   = root.querySelector("#mem-phase");
+      const qEl       = root.querySelector("#mem-question");
+      const optsWrap  = root.querySelector("#mem-options");
+      const reelEl    = root.querySelector("#mem-reel");
+      const previewEl = root.querySelector("#mem-preview");
+
+      /* Hide preview + countdown; show the reel instead */
+      if (previewEl) previewEl.style.display = "none";
+      if (reelEl)    reelEl.style.display   = "";
 
       if (phaseEl) {
         phaseEl.classList.remove("mem-phase--study");

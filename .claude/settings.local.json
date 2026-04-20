@@ -16,7 +16,32 @@
       "Bash(node --check js/questions/index.js)",
       "Bash(node --check js/questions/anagram.js)",
       "Bash(vercel whoami *)",
-      "Bash(git config *)"
+      "Bash(git config *)",
+      "Bash(vercel deploy *)",
+      "Bash(curl -s -o /dev/null -w \"Landing: HTTP %{http_code}\\\\n\" https://intelligence-test-kohl.vercel.app/)",
+      "Bash(curl -s -o /dev/null -w \"Test page: HTTP %{http_code}\\\\n\" https://intelligence-test-kohl.vercel.app/test.html)",
+      "Bash(curl -s -o /dev/null -w \"Results page: HTTP %{http_code}\\\\n\" https://intelligence-test-kohl.vercel.app/results.html)",
+      "Bash(curl -s -o /dev/null -w \"Landing \\(/\\):       HTTP %{http_code}\\\\n\" https://intelligence-test-kohl.vercel.app/)",
+      "Bash(curl -s -o /dev/null -w \"Test \\(/test\\):      HTTP %{http_code}\\\\n\" https://intelligence-test-kohl.vercel.app/test)",
+      "Bash(curl -s -o /dev/null -w \"Results \\(/results\\): HTTP %{http_code}\\\\n\" https://intelligence-test-kohl.vercel.app/results)",
+      "Bash(winget install *)",
+      "Bash(gh --version)",
+      "Bash(winget list *)",
+      "Bash(mkdir -p \"/c/Users/cube/bin\")",
+      "Bash(cd /tmp)",
+      "Bash(curl -sL -o gh.zip \"https://github.com/cli/cli/releases/latest/download/gh_2.82.1_windows_amd64.zip\")",
+      "Bash(unzip -q -o gh.zip -d gh-extract)",
+      "Bash(export PATH=\"/c/Program Files/GitHub CLI:/c/Users/cube/AppData/Local/Programs/GitHub CLI:$PATH\")",
+      "Bash(export PATH=\"/c/Program Files/GitHub CLI:$PATH\")",
+      "Bash(gh auth *)",
+      "Bash(gh repo *)",
+      "Bash(vercel git *)",
+      "Bash(curl -s -o /dev/null -w \"GitHub repo:   HTTP %{http_code}\\\\n\" https://github.com/cubebented/intelligence-test)",
+      "Bash(curl -s -o /dev/null -w \"Vercel \\(prod\\): HTTP %{http_code}\\\\n\" https://intelligence-test-kohl.vercel.app/)",
+      "Bash(node --check js/questions/series.js)",
+      "Bash(node --check js/questions/sequence.js)",
+      "Bash(node --check js/questions/memory-sequence.js)",
+      "Bash(node --check js/questions/memory-path.js)"
     ]
   }
 }
