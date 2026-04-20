@@ -2070,51 +2070,69 @@
   gap: var(--s-10);
 }
 
-/* ─── Simple results page ─── */
+/* ═══════════════════════════════════════════════════════════════════════
+   REVEAL SCREEN — dramatic, centered, chained CSS animations.
+   Full-viewport flex; content is dead-centered; each element fades/slides
+   in on its own delayed timeline so the moment unfolds like cinema.
+   ═══════════════════════════════════════════════════════════════════════ */
 
-.results-simple {
+.reveal-screen {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   text-align: center;
-  padding: var(--s-16) var(--s-6) var(--s-10);
-  max-width: 640px;
-  margin: 0 auto;
-  gap: var(--s-10);
+  padding: var(--s-8) var(--s-6);
+  width: 100%;
+  gap: var(--s-8);
 }
 
-/* Each staged section centers its own content */
-.rs-stage {
+.reveal-stage {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: var(--s-4);
+  gap: var(--s-5);
   width: 100%;
+  max-width: 640px;
 }
-.rs-stage[hidden] { display: none; }
-.rs-stage--in {
-  animation: rs-stage-in 650ms var(--ease-out) both;
+.reveal-stage[hidden] { display: none; }
+.reveal-stage--in {
+  animation: reveal-stage-in 700ms var(--ease-out) both;
 }
-@keyframes rs-stage-in {
-  from { opacity: 0; transform: translateY(16px); }
-  to   { opacity: 1; transform: translateY(0); }
+@keyframes reveal-stage-in {
+  from { opacity: 0; transform: translateY(24px); }
+  to   { opacity: 1; transform: translateY(0);   }
 }
 
-/* The big IQ number */
-.results-simple__num {
+/* "Your IQ is" preamble — fades in first */
+.reveal-preamble {
   font-family: var(--font-display);
-  font-size: clamp(7rem, 22vw, 13rem);
+  font-size: clamp(1.15rem, 2vw, 1.55rem);
+  font-weight: 300;
+  color: var(--text-secondary);
+  letter-spacing: -0.005em;
+  font-style: italic;
+  margin: 0;
+  opacity: 0;
+  animation: fade-up 800ms var(--ease-out) 250ms forwards;
+}
+
+/* The massive number. Blur-in + scale, then the JS count-up takes over. */
+.reveal-number {
+  font-family: var(--font-display);
+  font-size: clamp(7rem, 24vw, 15rem);
   font-weight: 600;
   line-height: 0.88;
   letter-spacing: -0.06em;
   color: var(--accent);
-  display: inline-flex;
-  align-items: baseline;
-  gap: 0.08em;
-  filter: drop-shadow(0 4px 60px rgba(196, 121, 90, 0.22));
+  position: relative;
+  padding: 0 0.1em;
+  opacity: 0;
+  animation: number-in 900ms var(--ease-out) 900ms forwards;
+  filter: drop-shadow(0 8px 80px rgba(196, 121, 90, 0.32));
 }
-.results-simple__num #iq-value {
+.reveal-number #iq-value {
   font-variant-numeric: tabular-nums;
   background: linear-gradient(170deg, var(--text) 0%, var(--accent) 55%, var(--accent-dim) 110%);
   -webkit-background-clip: text;
@@ -2122,27 +2140,113 @@
   -webkit-text-fill-color: transparent;
   color: transparent;
 }
-.results-simple__suffix {
-  font-size: 0.28em;
-  font-weight: 400;
-  color: var(--text-faint);
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  align-self: center;
-  margin-bottom: 0.4em;
+
+/* Soft breathing glow behind the number — ambient radiation */
+.reveal-number::before {
+  content: "";
+  position: absolute;
+  inset: -35% -25%;
+  background: radial-gradient(ellipse at center,
+    rgba(196, 121, 90, 0.22), transparent 65%);
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0;
+  animation:
+    glow-fade 1200ms var(--ease-out) 1100ms forwards,
+    glow-breathe 5s ease-in-out 2300ms infinite alternate;
 }
 
-.results-simple__band {
+@keyframes number-in {
+  from { opacity: 0; transform: scale(0.72); filter: blur(18px); }
+  to   { opacity: 1; transform: scale(1);    filter: blur(0); }
+}
+@keyframes glow-fade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes glow-breathe {
+  from { transform: scale(0.95); opacity: 0.85; }
+  to   { transform: scale(1.06); opacity: 1;    }
+}
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Band name — arrives after the number has finished counting */
+.reveal-band {
   font-family: var(--font-display);
   font-size: var(--fs-xl);
   font-weight: 500;
   color: var(--text);
-  letter-spacing: -0.025em;
+  letter-spacing: -0.03em;
   line-height: 1;
   margin: 0;
+  opacity: 0;
+  animation: fade-up 700ms var(--ease-out) 3200ms forwards;
 }
 
-.rs-more { margin-top: var(--s-5); min-width: 160px; }
+.reveal-btn {
+  margin-top: var(--s-6);
+  min-width: 180px;
+  opacity: 0;
+  animation: fade-up 700ms var(--ease-out) 3700ms forwards;
+}
+
+/* Stage 2 — description sits UNDER the big stats */
+.reveal-desc {
+  color: var(--text-secondary);
+  max-width: 48ch;
+  margin: 0 auto;
+  line-height: 1.55;
+  font-size: var(--fs-md);
+}
+
+/* Stage 3 — celebrity framing */
+.reveal-person {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  align-items: center;
+  padding: var(--s-6) var(--s-6);
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  width: 100%;
+  max-width: 480px;
+}
+.reveal-person__label {
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.reveal-person__name {
+  font-family: var(--font-display);
+  font-size: var(--fs-xl);
+  font-weight: 500;
+  color: var(--text);
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  margin-top: 4px;
+}
+.reveal-person__iq {
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+  margin-top: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal-preamble, .reveal-number, .reveal-band, .reveal-btn,
+  .reveal-number::before {
+    animation-duration: 0.01ms !important;
+    animation-delay: 0ms !important;
+  }
+}
 
 /* Stage 2 — big stats */
 .rs-stats-grid {
@@ -2189,78 +2293,7 @@
   margin-top: var(--s-2);
 }
 
-.results-simple__desc {
-  color: var(--text-secondary);
-  font-size: var(--fs-md);
-  line-height: 1.5;
-  max-width: 42ch;
-  margin: 0;
-}
-
-/* Person at your level — framed with hairline rules */
-.results-simple__people {
-  display: flex;
-  flex-direction: column;
-  gap: var(--s-2);
-  align-items: center;
-  padding: var(--s-5) var(--s-6);
-  border-top: 1px solid var(--border);
-  border-bottom: 1px solid var(--border);
-  width: 100%;
-  max-width: 520px;
-  margin-top: var(--s-3);
-}
-.results-simple__people-label {
-  font-family: var(--font-mono);
-  font-size: var(--fs-xs);
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-}
-.results-simple__people-name {
-  font-family: var(--font-display);
-  font-size: var(--fs-lg);
-  font-weight: 500;
-  color: var(--text);
-  letter-spacing: -0.015em;
-  line-height: 1.2;
-  margin-top: 2px;
-}
-.results-simple__people-iq {
-  font-family: var(--font-mono);
-  font-size: var(--fs-xs);
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--accent);
-  font-variant-numeric: tabular-nums;
-}
-
-.results-simple__stats {
-  font-family: var(--font-mono);
-  font-size: var(--fs-xs);
-  letter-spacing: 0.1em;
-  color: var(--text-muted);
-  display: flex;
-  gap: var(--s-3);
-  flex-wrap: wrap;
-  justify-content: center;
-}
-.results-simple__stats .dot { color: var(--text-faint); }
-
-.results-simple__actions {
-  margin-top: var(--s-3);
-}
-
-.results-simple__note {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--text-faint);
-  margin-top: var(--s-3);
-  max-width: 46ch;
-  line-height: 1.5;
-}
+/* (Legacy .results-simple__* classes were replaced by .reveal-* — removed) */
 
 /* ─── Per-question breakdown ─── */
 .breakdown-list {

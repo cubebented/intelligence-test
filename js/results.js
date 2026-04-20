@@ -133,8 +133,8 @@ async function boot(report) {
     finalIQ = stats.rawIQ + Math.max(-6, Math.min(6, ai.iqAdjustment));
   }
 
-  /* Snap to nearest 5 and clamp */
-  finalIQ = Math.max(55, Math.min(175, Math.round(finalIQ / 5) * 5));
+  /* Exact integer — no rounding to 5s */
+  finalIQ = Math.max(55, Math.min(175, Math.round(finalIQ)));
   const band = bandFor(finalIQ);
 
   setAnalyzerProgress(1);
@@ -340,23 +340,25 @@ function renderResults({ iq, band, description, person, stats, source }) {
   const esc = (s) => String(s ?? "")
     .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
-  /* Staged reveal:
-     Stage 1 — just the IQ + band + [Show More]
-     Stage 2 — adds big stats + [Next]
-     Stage 3 — adds celebrity card + retake button */
+  /* Dramatic staged reveal:
+     Stage 1 — "Your IQ is…" preamble → number counts up → band → button
+     Stage 2 — big stats + description + [Next]
+     Stage 3 — celebrity card + retake */
   root.innerHTML = `
-    <article class="results-simple">
-      <!-- STAGE 1: the number -->
-      <div class="rs-stage rs-stage--1 reveal" style="--i:0">
-        <div class="results-simple__num">
-          <span id="iq-value">${iq}</span><span class="results-simple__suffix">IQ</span>
-        </div>
-        <p class="results-simple__band">${band}</p>
-        <button class="btn btn--primary rs-more" id="show-more">Show more</button>
-      </div>
+    <article class="reveal-screen">
 
-      <!-- STAGE 2: big stats (hidden until Show More) -->
-      <div class="rs-stage rs-stage--2" id="rs-stats" hidden>
+      <!-- STAGE 1: the dramatic reveal -->
+      <section class="reveal-stage reveal-stage--one">
+        <p class="reveal-preamble">Your IQ is</p>
+        <div class="reveal-number" aria-live="polite">
+          <span id="iq-value">0</span>
+        </div>
+        <p class="reveal-band">${band}</p>
+        <button class="btn btn--primary reveal-btn" id="show-more">Show more</button>
+      </section>
+
+      <!-- STAGE 2: stats -->
+      <section class="reveal-stage reveal-stage--two" id="rs-stats" hidden>
         <div class="rs-stats-grid">
           <div class="rs-stat">
             <span class="rs-stat__n" id="stat-correct">${stats.correctCount}</span>
@@ -373,32 +375,33 @@ function renderResults({ iq, band, description, person, stats, source }) {
             <span class="rs-stat__l">total time</span>
           </div>
         </div>
-        <p class="results-simple__desc">${esc(description)}</p>
-        <button class="btn btn--primary rs-more" id="show-person">Next</button>
-      </div>
+        <p class="reveal-desc">${esc(description)}</p>
+        <button class="btn btn--primary" id="show-person">Next</button>
+      </section>
 
-      <!-- STAGE 3: celebrity reveal -->
-      <div class="rs-stage rs-stage--3" id="rs-person" hidden>
-        <div class="results-simple__people">
-          <span class="results-simple__people-label">At your level</span>
-          <span class="results-simple__people-name">${esc(person.name)}</span>
-          <span class="results-simple__people-iq">Reported IQ · ${person.iq}</span>
+      <!-- STAGE 3: celebrity -->
+      <section class="reveal-stage reveal-stage--three" id="rs-person" hidden>
+        <div class="reveal-person">
+          <span class="reveal-person__label">At your level</span>
+          <span class="reveal-person__name">${esc(person.name)}</span>
+          <span class="reveal-person__iq">Reported IQ · ${person.iq}</span>
         </div>
         <a class="btn btn--ghost" href="index.html">Take it again</a>
-      </div>
+      </section>
 
-      <p class="results-simple__note">
-        Rounded to the nearest 5. Approximation only — not a clinical score.
-      </p>
     </article>
   `;
 
-  animateCount(document.getElementById("iq-value"), iq);
+  /* Start the dramatic count-up after the preamble + number-appear animations
+     have played. 1000ms delay lines up with the CSS animation-delay on
+     .reveal-number (blur-in + scale-in finishes there). */
+  setTimeout(() => {
+    dramaticCount(document.getElementById("iq-value"), iq, 2000);
+  }, 1050);
 
   document.getElementById("show-more")?.addEventListener("click", () => {
     revealStage("rs-stats");
     document.getElementById("show-more").remove();
-    /* Animate-count the big stats too, so they feel alive */
     animateCountTo(document.getElementById("stat-correct"), 0, stats.correctCount, 1100);
     animateCountTo(document.getElementById("stat-pct"),     0, stats.pct,          1100);
   });
@@ -407,6 +410,22 @@ function renderResults({ iq, band, description, person, stats, source }) {
     revealStage("rs-person");
     document.getElementById("show-person").remove();
   });
+}
+
+/* Aggressively-eased count-up: fast ramp, dramatic deceleration.
+   Uses easeOutQuint so the final 10 points feel like a slow-motion landing. */
+function dramaticCount(el, target, durationMs = 2000) {
+  if (!el) return;
+  const from  = 40;
+  const start = performance.now();
+  el.textContent = from;
+  function tick(now) {
+    const t     = Math.min(1, (now - start) / durationMs);
+    const eased = 1 - Math.pow(1 - t, 5);
+    el.textContent = Math.round(from + (target - from) * eased);
+    if (t < 1) requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
 }
 
 /* Smoothly un-hide + fade/slide in a stage */
@@ -434,26 +453,6 @@ function formatDuration(ms) {
   const m = Math.floor(ms / 60000);
   const s = Math.floor((ms % 60000) / 1000);
   return `${m}m ${String(s).padStart(2, "0")}s`;
-}
-
-/* Count up from target-40 → target, eased.
-   Since we round to nearest 5, step by 5 so the digits don't flicker
-   through implausible intermediate values. */
-function animateCount(el, target, durationMs = 1900) {
-  if (!el) return;
-  const from  = Math.max(55, target - 40);
-  const start = performance.now();
-  el.textContent = from;
-  function tick(now) {
-    const t     = Math.min(1, (now - start) / durationMs);
-    const eased = t === 1 ? 1 : 1 - Math.pow(2, -10 * t);
-    const raw   = from + (target - from) * eased;
-    /* Snap to multiples of 5 while animating too */
-    const snap  = Math.round(raw / 5) * 5;
-    el.textContent = snap;
-    if (t < 1) requestAnimationFrame(tick);
-  }
-  requestAnimationFrame(tick);
 }
 
 /* ─── Util ─── */
