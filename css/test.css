@@ -2100,22 +2100,79 @@
 .reveal-stage--in {
   animation: reveal-stage-in 700ms var(--ease-out) both;
 }
+.reveal-stage--out {
+  animation: reveal-stage-out 340ms var(--ease-in) both;
+  pointer-events: none;
+}
 @keyframes reveal-stage-in {
   from { opacity: 0; transform: translateY(24px); }
   to   { opacity: 1; transform: translateY(0);   }
 }
+@keyframes reveal-stage-out {
+  from { opacity: 1; transform: translateY(0); }
+  to   { opacity: 0; transform: translateY(-18px); }
+}
 
-/* "Your IQ is" preamble — fades in first */
+/* "Your IQ is…" preamble — words stagger in one at a time with
+   blur resolve, then the whole phrase breathes softly. */
 .reveal-preamble {
   font-family: var(--font-display);
-  font-size: clamp(1.15rem, 2vw, 1.55rem);
+  font-size: clamp(1.25rem, 2.3vw, 1.75rem);
   font-weight: 300;
   color: var(--text-secondary);
   letter-spacing: -0.005em;
   font-style: italic;
   margin: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35em;
+  animation: preamble-breathe 4.8s ease-in-out 1600ms infinite alternate;
+}
+.reveal-preamble__word {
+  display: inline-block;
   opacity: 0;
-  animation: fade-up 800ms var(--ease-out) 250ms forwards;
+  filter: blur(14px);
+  transform: translateY(10px);
+  animation: preamble-word-in 900ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  will-change: opacity, filter, transform;
+}
+.reveal-preamble__word:nth-of-type(1) { animation-delay: 300ms; }
+.reveal-preamble__word:nth-of-type(2) { animation-delay: 500ms; }
+.reveal-preamble__word:nth-of-type(3) { animation-delay: 700ms; }
+
+@keyframes preamble-word-in {
+  to { opacity: 1; filter: blur(0); transform: translateY(0); }
+}
+@keyframes preamble-breathe {
+  from { opacity: 0.82; }
+  to   { opacity: 1;    }
+}
+
+/* Ellipsis dots — pulse one at a time to suggest "thinking / building up" */
+.reveal-preamble__dots {
+  display: inline-flex;
+  gap: 3px;
+  margin-left: 0.1em;
+  align-items: center;
+  opacity: 0;
+  animation: preamble-dots-in 400ms var(--ease-out) 950ms forwards;
+}
+.reveal-preamble__dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--accent);
+  opacity: 0.5;
+  animation: preamble-dot-pulse 1.2s ease-in-out infinite;
+}
+.reveal-preamble__dot:nth-child(2) { animation-delay: 180ms; }
+.reveal-preamble__dot:nth-child(3) { animation-delay: 360ms; }
+@keyframes preamble-dots-in {
+  to { opacity: 1; }
+}
+@keyframes preamble-dot-pulse {
+  0%, 100% { opacity: 0.3; transform: scale(0.85); }
+  50%      { opacity: 1;   transform: scale(1.15); }
 }
 
 /* The massive number. Blur-in + scale, then the JS count-up takes over. */
@@ -2129,7 +2186,7 @@
   position: relative;
   padding: 0 0.1em;
   opacity: 0;
-  animation: number-in 900ms var(--ease-out) 900ms forwards;
+  animation: number-in 900ms var(--ease-out) 1750ms forwards;
   filter: drop-shadow(0 8px 80px rgba(196, 121, 90, 0.32));
 }
 .reveal-number #iq-value {
@@ -2152,8 +2209,8 @@
   pointer-events: none;
   opacity: 0;
   animation:
-    glow-fade 1200ms var(--ease-out) 1100ms forwards,
-    glow-breathe 5s ease-in-out 2300ms infinite alternate;
+    glow-fade 1200ms var(--ease-out) 1950ms forwards,
+    glow-breathe 5s ease-in-out 3150ms infinite alternate;
 }
 
 @keyframes number-in {
@@ -2183,14 +2240,14 @@
   line-height: 1;
   margin: 0;
   opacity: 0;
-  animation: fade-up 700ms var(--ease-out) 3200ms forwards;
+  animation: fade-up 700ms var(--ease-out) 4050ms forwards;
 }
 
 .reveal-btn {
   margin-top: var(--s-6);
   min-width: 180px;
   opacity: 0;
-  animation: fade-up 700ms var(--ease-out) 3700ms forwards;
+  animation: fade-up 700ms var(--ease-out) 4550ms forwards;
 }
 
 /* Stage 2 — description sits UNDER the big stats */

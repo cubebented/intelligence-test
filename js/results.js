@@ -348,8 +348,17 @@ function renderResults({ iq, band, description, person, stats, source }) {
     <article class="reveal-screen">
 
       <!-- STAGE 1: the dramatic reveal -->
-      <section class="reveal-stage reveal-stage--one">
-        <p class="reveal-preamble">Your IQ is</p>
+      <section class="reveal-stage reveal-stage--one" id="rs-one">
+        <p class="reveal-preamble">
+          <span class="reveal-preamble__word">Your</span><!--
+       --><span class="reveal-preamble__word">IQ</span><!--
+       --><span class="reveal-preamble__word">is</span><!--
+       --><span class="reveal-preamble__dots" aria-hidden="true">
+            <span class="reveal-preamble__dot"></span>
+            <span class="reveal-preamble__dot"></span>
+            <span class="reveal-preamble__dot"></span>
+          </span>
+        </p>
         <div class="reveal-number" aria-live="polite">
           <span id="iq-value">0</span>
         </div>
@@ -392,24 +401,41 @@ function renderResults({ iq, band, description, person, stats, source }) {
     </article>
   `;
 
-  /* Start the dramatic count-up after the preamble + number-appear animations
-     have played. 1000ms delay lines up with the CSS animation-delay on
-     .reveal-number (blur-in + scale-in finishes there). */
+  /* Start the count-up AFTER the preamble words have all landed and the
+     number element has finished its blur-in (animation-delay 1750ms +
+     enter duration 900ms → the count begins as the number lands). */
   setTimeout(() => {
     dramaticCount(document.getElementById("iq-value"), iq, 2000);
-  }, 1050);
+  }, 1900);
 
   document.getElementById("show-more")?.addEventListener("click", () => {
-    revealStage("rs-stats");
-    document.getElementById("show-more").remove();
-    animateCountTo(document.getElementById("stat-correct"), 0, stats.correctCount, 1100);
-    animateCountTo(document.getElementById("stat-pct"),     0, stats.pct,          1100);
+    /* Smoothly replace stage 1 with stage 2 — not stack */
+    transitionStage("rs-one", "rs-stats", () => {
+      animateCountTo(document.getElementById("stat-correct"), 0, stats.correctCount, 1100);
+      animateCountTo(document.getElementById("stat-pct"),     0, stats.pct,          1100);
+    });
   });
 
   document.getElementById("show-person")?.addEventListener("click", () => {
-    revealStage("rs-person");
-    document.getElementById("show-person").remove();
+    transitionStage("rs-stats", "rs-person");
   });
+}
+
+/* Fade out the current stage, then fade in the next. Keeps the viewport
+   from "stacking" old + new content during a reveal transition. */
+function transitionStage(outId, inId, onAfterIn) {
+  const out = document.getElementById(outId);
+  const next = document.getElementById(inId);
+  if (!next) return;
+  if (out) {
+    out.classList.add("reveal-stage--out");
+    setTimeout(() => { out.hidden = true; }, 360);
+  }
+  setTimeout(() => {
+    next.hidden = false;
+    requestAnimationFrame(() => next.classList.add("reveal-stage--in"));
+    if (onAfterIn) setTimeout(onAfterIn, 200);
+  }, 300);
 }
 
 /* Aggressively-eased count-up: fast ramp, dramatic deceleration.
@@ -426,14 +452,6 @@ function dramaticCount(el, target, durationMs = 2000) {
     if (t < 1) requestAnimationFrame(tick);
   }
   requestAnimationFrame(tick);
-}
-
-/* Smoothly un-hide + fade/slide in a stage */
-function revealStage(id) {
-  const el = document.getElementById(id);
-  if (!el) return;
-  el.hidden = false;
-  requestAnimationFrame(() => el.classList.add("rs-stage--in"));
 }
 
 function animateCountTo(el, from, target, durationMs) {
