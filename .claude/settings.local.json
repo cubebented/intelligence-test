@@ -44,7 +44,8 @@
       "Bash(node --check js/questions/memory-path.js)",
       "Bash(find \"C:\\\\Users\\\\cube\\\\Downloads\\\\IQTest\" -name \"*.css\" -exec grep -l \"tm-warn\\\\|tm-urgent\" {} \\\\;)",
       "Bash(node --check js/questions/problem.js)",
-      "Bash(node --check js/main.js)"
+      "Bash(node --check js/main.js)",
+      "Bash(node -e ' *)"
     ]
   }
 }
