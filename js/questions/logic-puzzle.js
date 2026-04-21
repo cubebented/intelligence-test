@@ -390,7 +390,7 @@ export function generate(rng) {
   return {
     type: "logic-puzzle",
     category: "Logic Puzzle",
-    prompt: "Read the statement. Pick the answer that logically follows.",
+    prompt: "Read the clue. Pick the answer that must be true.",
 
     render() {
       const opts = data.options.map((text, i) => `

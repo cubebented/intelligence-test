@@ -12,27 +12,31 @@
 const DEEPSEEK_API_KEY = "sk-751f504cc1fb461f836f935b34185c81";
 const DEEPSEEK_URL     = "https://api.deepseek.com/chat/completions";
 const DEEPSEEK_MODEL   = "deepseek-chat";
-const API_TIMEOUT_MS   = 11000;
+const API_TIMEOUT_MS   = 14000;   /* deeper analysis + 900-token ceiling → allow more wall-clock */
 
 const DOMAINS = {
-  "Number Series":      "Fluid Reasoning",
-  "Matrix Reasoning":   "Fluid Reasoning",
-  "Pattern Sequence":   "Fluid Reasoning",
-  "Word Problems":      "Fluid Reasoning",
-  "Paper Folding":      "Spatial",
-  "Cube Net":           "Spatial",
-  "Figure Analogy":     "Pattern Recognition",
-  "Odd One Out":        "Pattern Recognition",
-  "Hidden Figure":      "Pattern Recognition",
-  "Memory Grid":        "Working Memory",
-  "Memory Sequence":    "Working Memory",
-  "Memory Path":        "Working Memory",
-  "Logic Puzzle":       "Verbal Reasoning",
-  "Verbal Analogy":     "Verbal Reasoning",
-  "Coding & Decoding":  "Verbal Reasoning",
-  "Deduction":          "Verbal Reasoning",
-  "Relationships":      "Verbal Reasoning",
-  "Anagram":            "Verbal Reasoning",
+  "Number Series":        "Fluid Reasoning",
+  "Matrix Reasoning":     "Fluid Reasoning",
+  "Pattern Sequence":     "Fluid Reasoning",
+  "Word Problems":        "Fluid Reasoning",
+  "Problem Solving":      "Fluid Reasoning",
+  "Paper Folding":        "Spatial",
+  "Cube Net":             "Spatial",
+  "Figure Analogy":       "Pattern Recognition",
+  "Odd One Out":          "Pattern Recognition",
+  "Hidden Figure":        "Pattern Recognition",
+  "Memory Grid":          "Working Memory",
+  "Memory Sequence":      "Working Memory",
+  "Memory Path":          "Working Memory",
+  "Logic Puzzle":         "Verbal Reasoning",
+  "Verbal Analogy":       "Verbal Reasoning",
+  "Coding & Decoding":    "Verbal Reasoning",
+  "Deduction":            "Verbal Reasoning",
+  "Relationships":        "Verbal Reasoning",
+  "Anagram":              "Verbal Reasoning",
+  "Sentence Completion":  "Verbal Reasoning",
+  "Synonyms":             "Verbal Reasoning",
+  "Antonyms":             "Verbal Reasoning",
 };
 
 /* ─── Famous people / descriptors by IQ bucket (rounded to 5) ─── */
@@ -118,28 +122,42 @@ async function boot(report) {
     sleep(API_TIMEOUT_MS).then(() => null),
   ]);
 
-  /* Smoother, shorter phases — less text, more rhythm */
+  /* Six-phase calibration sequence — IQ estimate converges on the raw score
+     while CI tightens and z-score / percentile update each step. */
+  const T = stats.rawIQ;
   await runPhases([
-    { text: "Analyzing responses",  ms: 1100, prog: 0.28 },
-    { text: "Weighing difficulty",  ms: 1200, prog: 0.58 },
-    { text: "Calibrating score",    ms: 1100, prog: 0.86 },
+    { text: "Reading your responses",    ms: 1100, iq: null,      ci: 18 },
+    { text: "Scoring each domain",       ms: 1200, iq: T - 7.4,   ci: 14 },
+    { text: "Weighting by difficulty",   ms: 1200, iq: T - 2.9,   ci: 10 },
+    { text: "Mapping to distribution",   ms: 1200, iq: T - 0.8,   ci: 7  },
+    { text: "Cross-referencing norms",   ms: 1200, iq: T + 0.3,   ci: 5  },
+    { text: "Finalizing estimate",       ms: 1100, iq: T,         ci: 3  },
   ]);
 
   const ai = await aiPromise;
 
-  /* Let the AI nudge the IQ within ±6 if it returned a modifier */
+  /* Let the AI nudge the IQ within ±8 if it returned a modifier.
+     The wider range reflects the deeper analysis — the model now looks at
+     ceiling patterns, timing signatures, and knowledge-vs-reasoning gaps,
+     so it has more grounded reasons to adjust than the previous ±6 cap. */
   let finalIQ = stats.rawIQ;
   if (ai && typeof ai.iqAdjustment === "number" && Number.isFinite(ai.iqAdjustment)) {
-    finalIQ = stats.rawIQ + Math.max(-6, Math.min(6, ai.iqAdjustment));
+    finalIQ = stats.rawIQ + Math.max(-8, Math.min(8, ai.iqAdjustment));
   }
 
   /* Exact integer — no rounding to 5s */
   finalIQ = Math.max(55, Math.min(175, Math.round(finalIQ)));
   const band = bandFor(finalIQ);
 
-  setAnalyzerProgress(1);
-  await sleep(400);
-  await fadeOutAnalyzer();
+  /* Hold on the locked calibrator for a beat before the transition */
+  await sleep(500);
+
+  /* Mount the reveal-screen on top of the analyzer.
+     It is position:fixed z-index:20, so it instantly covers the analyzer
+     (same dark background = no visible flash) and fades to opacity:1 over
+     350ms. The analyzer can quietly exit in the background and is removed
+     once the reveal-screen is solid. */
+  const analyzerEl = document.getElementById("analyzer");
 
   renderResults({
     iq:          finalIQ,
@@ -147,8 +165,13 @@ async function boot(report) {
     description: (ai && ai.description) || defaultDescription(finalIQ),
     person:      personForIQ(finalIQ),
     stats,
+    ai,                                    // full AI analysis object (may be null)
     source:      ai ? "ai" : "local",
   });
+
+  /* Remove the analyzer once the reveal-screen is fully opaque */
+  await sleep(400);
+  analyzerEl?.remove();
 }
 
 /* ─── Stats pipeline ─── */
@@ -207,8 +230,42 @@ function defaultDescription(iq) {
   return "A low session score — often a tired or rushed run. Retake on another day.";
 }
 
-/* ─── DeepSeek ─── */
+/* ─── DeepSeek ───
+   The analyst does a deep multi-dimensional read of the full item-by-item
+   record. We give it raw data + domain groupings + timing ratios + difficulty
+   hints, and it returns a rich structured assessment we render on the
+   results page. If this call fails we fall back to the local estimate. */
 async function callDeepSeek(report, stats) {
+  /* Per-domain roll-up so the model doesn't have to aggregate itself.
+     Each domain gets: count, correct, accuracy, avg time, avg time-used
+     ratio (elapsed / timeLimit) — the key signal for "rushed vs. deliberate". */
+  const byDomain = {};
+  for (const x of report.items) {
+    const dom = DOMAINS[x.category] || "Other";
+    const d = byDomain[dom] ||= {
+      domain: dom, total: 0, correct: 0, skipped: 0, timedOut: 0,
+      sumElapsed: 0, sumLimit: 0, categories: new Set(),
+    };
+    d.total    += 1;
+    d.correct  += x.correct  ? 1 : 0;
+    d.skipped  += x.skipped  ? 1 : 0;
+    d.timedOut += x.timedOut ? 1 : 0;
+    d.sumElapsed += Math.round((x.elapsed || 0) / 1000);
+    d.sumLimit   += x.timeLimit || 60;
+    d.categories.add(x.category);
+  }
+  const domains = Object.values(byDomain).map(d => ({
+    domain:      d.domain,
+    categories:  [...d.categories],
+    total:       d.total,
+    correct:     d.correct,
+    accuracy:    d.total ? Math.round((d.correct / d.total) * 100) : 0,
+    skipped:     d.skipped,
+    timedOut:    d.timedOut,
+    avgSeconds:  d.total ? Math.round(d.sumElapsed / d.total) : 0,
+    timeUsedPct: d.sumLimit ? Math.round((d.sumElapsed / d.sumLimit) * 100) : 0,
+  }));
+
   const payload = {
     raw_iq_estimate: stats.rawIQ,
     overall: {
@@ -220,40 +277,113 @@ async function callDeepSeek(report, stats) {
       skipped:  stats.skippedCount,
       timedOut: stats.timedOutCnt,
     },
-    items: report.items.map(x => ({
-      category: x.category,
-      domain:   DOMAINS[x.category] || "Other",
-      correct:  x.correct,
-      skipped:  x.skipped,
-      timedOut: x.timedOut,
+    byDomain: domains,
+    items: report.items.map((x, i) => ({
+      index:     i + 1,
+      category:  x.category,
+      domain:    DOMAINS[x.category] || "Other",
+      correct:   x.correct,
+      skipped:   x.skipped,
+      timedOut:  x.timedOut,
       elapsedSeconds:   Math.round((x.elapsed || 0) / 1000),
       timeLimitSeconds: x.timeLimit || null,
+      timeUsedPct: x.timeLimit
+        ? Math.round(((x.elapsed || 0) / 1000 / x.timeLimit) * 100)
+        : null,
     })),
   };
 
-  const system = `You are a cognitive assessment analyst. You review an IQ test
-result and return ONLY a JSON object (no markdown, no commentary).
+  const system = `You are a senior cognitive-assessment analyst. You review a
+completed IQ-test session and produce a deep, honest, specific analysis in
+JSON. Return ONLY the JSON object — no markdown, no prose outside the JSON.
 
-Schema:
+The test covers FIVE cognitive domains:
+  • Fluid Reasoning — Number Series, Matrix Reasoning, Pattern Sequence,
+    Word Problems, Problem Solving
+  • Spatial         — Paper Folding, Cube Net
+  • Pattern Recognition — Figure Analogy, Odd One Out, Hidden Figure
+  • Working Memory  — Memory Grid, Memory Sequence, Memory Path
+  • Verbal Reasoning — Logic Puzzle, Verbal Analogy, Coding & Decoding,
+    Deduction, Relationships, Anagram, Sentence Completion, Synonyms, Antonyms
+
+Every question has a 60-second limit. Items are scored correct / incorrect /
+skipped / timedOut, with per-item elapsed time.
+
+═══ HOW TO ANALYSE ═══
+Do not just describe the score — identify PATTERNS. Look for:
+
+1. Domain-skew: which domains stand clearly above / below this person's
+   own average? (Use byDomain accuracies.)
+2. Timing signature:
+     — "rushed" = most correct items used <35% of time
+     — "deliberate" = most correct items used 60%+ of time
+     — "timed-out" = answered close to the buzzer often
+3. Knowledge-vs-reasoning: verbal domains lean vocabulary (knowledge);
+   fluid/spatial lean reasoning. A wide gap is diagnostic.
+4. Ceiling pattern: if they got all the hardest items (matrix, deduction,
+   sequence) but missed an easy one (anagram), that's signal — maybe tired
+   or rushed early, not a lack of ability.
+5. Error type: skip = gave up; timed-out = couldn't finish; wrong = tried
+   and failed. Each has a different interpretation.
+6. Consistency: are accuracies even across domains, or spiky?
+
+═══ RESPONSE SCHEMA ═══
 {
-  "iqAdjustment": number,   // integer in [-6, +6]. Nudge to apply to the raw IQ
-                            // estimate based on pattern nuance — e.g. got hard
-                            // items right but missed easy ones (+), or the
-                            // reverse (-), or rushed successful items (+),
-                            // or timed out on items they got right (+).
-                            // Default 0 if nothing stands out.
-  "description": string     // ONE sentence, ≤ 22 words, specific and honest.
-                            // Mention a concrete pattern if visible. No fluff,
-                            // no "great job", no disclaimers.
+  "iqAdjustment": number,       // integer in [-8, +8]. Apply to raw IQ based
+                                // on pattern nuance. + for: nailed hardest
+                                // items, correct-while-timed-out (knew it,
+                                // ran out of time), strong under-time usage.
+                                // − for: lucky distribution, skipped easy
+                                // items, "all surface, no depth" pattern.
+                                // 0 if truly nothing stands out.
+  "description": string,         // 2–3 sentences, ≤ 55 words total. Lead
+                                // with the single most specific observation
+                                // you can defend from the data. No clichés,
+                                // no "great job", no disclaimers, no
+                                // "overall you scored X". Concrete nouns.
+  "cognitiveStyle": string,      // 2–4 words describing their approach,
+                                // e.g. "Fast intuitive", "Deliberate
+                                // analytical", "Methodical but hesitant",
+                                // "Pattern-first thinker".
+  "strongestDomain": string,     // The cognitive-domain name (from the five
+                                // above) where they performed best relative
+                                // to their own average — not absolute.
+  "weakestDomain": string,       // Same, but weakest relative to own avg.
+                                // If all domains are within 10% of each
+                                // other, pick the one with lowest accuracy.
+  "strengths": string[],         // 2–3 short phrases (≤ 8 words each)
+                                // describing concrete strengths, e.g.
+                                // "Quick pattern recognition under pressure",
+                                // "Strong vocabulary depth", "Spatial
+                                // visualisation". Ground in the data.
+  "growthAreas": string[],       // 1–2 short phrases (≤ 8 words each) of
+                                // honest growth areas. Not harsh — framed
+                                // as "room to grow", not "you suck at X".
+  "timePattern": string,         // ONE sentence describing their time usage
+                                // across the test. Be specific: "Used ~55%
+                                // of available time on correct items — an
+                                // efficient, confident pace."
+  "notablePattern": string,      // ONE sentence calling out the single most
+                                // INTERESTING behavioural signal — the thing
+                                // you'd mention to them if you had 10 seconds.
+                                // E.g. "Every timed-out question was a
+                                // memory task — working-memory span seems
+                                // to be the limiter, not reasoning."
+  "consistencyScore": number     // 0–100. 100 = identical accuracy across
+                                // all domains; 0 = wildly uneven. Computed
+                                // as 100 minus the std-dev of per-domain
+                                // accuracies, roughly.
 }
 
-The test covers Fluid Reasoning (Number Series, Matrix, Pattern Sequence, Word
-Problems), Spatial (Paper Folding, Cube Net), Pattern Recognition (Figure
-Analogy, Odd One Out, Hidden Figure), Working Memory (Memory Grid/Sequence/
-Path), and Verbal Reasoning (Logic Puzzle, Verbal Analogy, Coding & Decoding,
-Deduction, Relationships, Anagram).`;
+Ground EVERY claim in the byDomain and items data. If the data doesn't
+support a claim, don't make it. Prefer "the data is inconclusive" over
+a fabricated pattern.`;
 
-  const user = `Raw IQ = ${stats.rawIQ}. Full data:\n${JSON.stringify(payload, null, 2)}`;
+  const user = `Raw local IQ estimate: ${stats.rawIQ}.
+Full session record:
+${JSON.stringify(payload, null, 2)}
+
+Analyse the pattern. Return the JSON per schema.`;
 
   const res = await fetch(DEEPSEEK_URL, {
     method: "POST",
@@ -268,8 +398,8 @@ Deduction, Relationships, Anagram).`;
         { role: "user",   content: user   },
       ],
       response_format: { type: "json_object" },
-      temperature: 0.3,
-      max_tokens: 300,
+      temperature: 0.35,
+      max_tokens: 900,
     }),
   });
 
@@ -291,37 +421,121 @@ Deduction, Relationships, Anagram).`;
 function renderAnalyzer() {
   root.innerHTML = `
     <div class="analyzer" id="analyzer">
-      <div class="analyzer__edge-glow"></div>
-      <svg class="analyzer__visual" viewBox="0 0 140 140" aria-hidden="true">
-        <circle class="analyzer__ring analyzer__ring--outer" cx="70" cy="70" r="60"/>
-        <circle class="analyzer__ring analyzer__ring--mid"   cx="70" cy="70" r="44"/>
-        <circle class="analyzer__ring analyzer__ring--inner" cx="70" cy="70" r="22"/>
-        <circle class="analyzer__core" cx="70" cy="70" r="3"/>
-        <g class="analyzer__orbit">
-          <circle cx="70" cy="10" r="3.5"/>
-        </g>
-      </svg>
-      <p class="analyzer__label">Calculating</p>
-      <p class="analyzer__phase" id="analyzer-phase">Analyzing responses</p>
-      <div class="analyzer__progress">
-        <div class="analyzer__progress-fill" id="analyzer-progress"></div>
+      <header class="analyzer__header">
+        <span class="analyzer__eyebrow">Calculating</span>
+        <span class="analyzer__counter" id="analyzer-counter">01 &middot; 03</span>
+      </header>
+
+      <div class="analyzer__stage">
+        <svg class="analyzer__viz" viewBox="0 0 240 160" role="img"
+             aria-labelledby="ana-title ana-desc">
+          <title id="ana-title">IQ score calibration</title>
+          <desc id="ana-desc">A calibration needle homing in on the IQ distribution.</desc>
+
+          <!-- Corner viewfinder brackets — stagger in during intro -->
+          <g class="ana-brackets" stroke="var(--text-faint)" stroke-width="1"
+             fill="none" stroke-linecap="round">
+            <path class="ana-bracket" style="--i:0" d="M 8 8 L 8 22 M 8 8 L 22 8"/>
+            <path class="ana-bracket" style="--i:1" d="M 232 8 L 232 22 M 232 8 L 218 8"/>
+            <path class="ana-bracket" style="--i:2" d="M 8 152 L 8 138 M 8 152 L 22 152"/>
+            <path class="ana-bracket" style="--i:3" d="M 232 152 L 232 138 M 232 152 L 218 152"/>
+          </g>
+
+          <!-- Three dashed guide lines at 70 / 100 / 130 -->
+          <g class="ana-grid" stroke="var(--hairline-strong)" stroke-width="1" stroke-dasharray="1 3">
+            <line x1="60"  y1="82" x2="60"  y2="124"/>
+            <line x1="120" y1="40" x2="120" y2="124"/>
+            <line x1="180" y1="82" x2="180" y2="124"/>
+          </g>
+
+          <!-- X-axis baseline -->
+          <line class="ana-axis" x1="36" y1="124" x2="204" y2="124"
+                stroke="var(--border-strong)" stroke-width="1"/>
+
+          <!-- Three axis labels only -->
+          <g class="ana-labels" font-family="Geist Mono, monospace" font-size="7"
+             fill="var(--text-muted)" letter-spacing="1" text-anchor="middle">
+            <text x="60"  y="138">70</text>
+            <text x="120" y="138">100</text>
+            <text x="180" y="138">130</text>
+          </g>
+
+          <!-- Bell curve -->
+          <path class="ana-curve"
+                d="M 36 124 C 76 124 90 48 120 40 C 150 48 164 124 204 124"
+                fill="none" stroke="var(--text-secondary)" stroke-width="1.4"
+                stroke-linecap="round" pathLength="1"/>
+
+          <!-- Calibrator indicator: simple needle + dot -->
+          <g class="ana-cal">
+            <line x1="0" y1="36" x2="0" y2="124" stroke="var(--accent)" stroke-width="1.3"/>
+            <circle class="ana-cal-dot" cx="0" cy="36" r="3" fill="var(--accent)"/>
+          </g>
+        </svg>
+
+        <p class="analyzer__phase" id="analyzer-phase">Reading your responses</p>
       </div>
     </div>
   `;
 }
 
 async function runPhases(phases) {
-  for (const p of phases) {
+  const total = phases.length;
+  for (let i = 0; i < phases.length; i++) {
+    const p = phases[i];
+    setAnalyzerCounter(i + 1, total);
     setAnalyzerPhase(p.text);
     setAnalyzerProgress(p.prog);
+    if (p.iq != null) setAnalyzerReadout(p.iq, p.ci);
+    else              setAnalyzerCI(p.ci);
     await sleep(p.ms);
   }
+}
+function setAnalyzerCounter(n, total) {
+  const el = document.getElementById("analyzer-counter");
+  if (!el) return;
+  const pad = (x) => String(x).padStart(2, "0");
+  el.innerHTML = `${pad(n)} &middot; ${pad(total)}`;
+}
+/* Updates the live readout block inside the analyzer SVG: IQ, z-score,
+   percentile, and confidence-interval width. Silently no-ops if any
+   target element is missing. */
+function setAnalyzerReadout(iq, ci) {
+  const readout = document.getElementById("ana-readout");
+  const zEl     = document.getElementById("ana-z");
+  const pctEl   = document.getElementById("ana-pct");
+  if (readout) readout.textContent = iq.toFixed(1);
+  const z = (iq - 100) / 15;
+  if (zEl)   zEl.textContent   = (z >= 0 ? "+" : "") + z.toFixed(2);
+  if (pctEl) pctEl.textContent = String(Math.max(1, Math.min(99, Math.round(normalCdf(z) * 100))));
+  setAnalyzerCI(ci);
+}
+function setAnalyzerCI(ci) {
+  const ciEl = document.getElementById("ana-ci-val");
+  if (ciEl && ci != null) ciEl.textContent = String(ci);
+}
+/* Standard-normal CDF via Abramowitz & Stegun 26.2.17 — good to ~7.5e-8 */
+function normalCdf(z) {
+  const sign = z < 0 ? -1 : 1;
+  const x = Math.abs(z) / Math.SQRT2;
+  const t = 1 / (1 + 0.3275911 * x);
+  const y = 1 - (((((1.061405429 * t - 1.453152027) * t) + 1.421413741) * t
+                - 0.284496736) * t + 0.254829592) * t * Math.exp(-x * x);
+  return 0.5 * (1 + sign * y);
 }
 function setAnalyzerPhase(text) {
   const el = document.getElementById("analyzer-phase");
   if (!el) return;
-  el.style.opacity = "0";
-  setTimeout(() => { el.textContent = text; el.style.opacity = ""; }, 200);
+  if (el.textContent === text) return;
+  el.classList.remove("analyzer__phase--in");
+  el.classList.add("analyzer__phase--out");
+  setTimeout(() => {
+    el.textContent = text;
+    el.classList.remove("analyzer__phase--out");
+    /* Force reflow so the `--in` animation restarts */
+    void el.offsetWidth;
+    el.classList.add("analyzer__phase--in");
+  }, 240);
 }
 function setAnalyzerProgress(frac) {
   const el = document.getElementById("analyzer-progress");
@@ -335,16 +549,104 @@ async function fadeOutAnalyzer() {
   await sleep(500);
 }
 
-/* ─── Final results render — SIMPLE ─── */
-function renderResults({ iq, band, description, person, stats, source }) {
+/* ─── Final results render ─── */
+function renderResults({ iq, band, description, person, stats, ai, source }) {
   const esc = (s) => String(s ?? "")
     .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+  /* Rich AI analysis blocks — only rendered when we actually got a response.
+     Each block is optional so a partial / degraded AI response still renders
+     gracefully (we never show empty cards). */
+  const aiBlocks = (() => {
+    if (!ai) return "";
+    const parts = [];
+
+    if (ai.cognitiveStyle) {
+      parts.push(`
+        <div class="ai-meta">
+          <span class="ai-meta__k">Cognitive style</span>
+          <span class="ai-meta__v">${esc(ai.cognitiveStyle)}</span>
+        </div>`);
+    }
+
+    if (ai.strongestDomain || ai.weakestDomain) {
+      parts.push(`
+        <div class="ai-domains">
+          ${ai.strongestDomain ? `
+            <div class="ai-domain ai-domain--up">
+              <span class="ai-domain__label">Strongest</span>
+              <span class="ai-domain__name">${esc(ai.strongestDomain)}</span>
+            </div>` : ""}
+          ${ai.weakestDomain ? `
+            <div class="ai-domain ai-domain--down">
+              <span class="ai-domain__label">Room to grow</span>
+              <span class="ai-domain__name">${esc(ai.weakestDomain)}</span>
+            </div>` : ""}
+        </div>`);
+    }
+
+    if (Array.isArray(ai.strengths) && ai.strengths.length) {
+      parts.push(`
+        <div class="ai-list">
+          <span class="ai-list__label">Strengths</span>
+          <ul class="ai-list__items">
+            ${ai.strengths.slice(0, 3).map(s => `<li>${esc(s)}</li>`).join("")}
+          </ul>
+        </div>`);
+    }
+
+    if (Array.isArray(ai.growthAreas) && ai.growthAreas.length) {
+      parts.push(`
+        <div class="ai-list ai-list--growth">
+          <span class="ai-list__label">Growth areas</span>
+          <ul class="ai-list__items">
+            ${ai.growthAreas.slice(0, 2).map(s => `<li>${esc(s)}</li>`).join("")}
+          </ul>
+        </div>`);
+    }
+
+    if (ai.timePattern) {
+      parts.push(`
+        <div class="ai-insight">
+          <span class="ai-insight__label">Timing</span>
+          <p class="ai-insight__text">${esc(ai.timePattern)}</p>
+        </div>`);
+    }
+
+    if (ai.notablePattern) {
+      parts.push(`
+        <div class="ai-insight ai-insight--notable">
+          <span class="ai-insight__label">Notable pattern</span>
+          <p class="ai-insight__text">${esc(ai.notablePattern)}</p>
+        </div>`);
+    }
+
+    if (typeof ai.consistencyScore === "number") {
+      const c = Math.max(0, Math.min(100, Math.round(ai.consistencyScore)));
+      parts.push(`
+        <div class="ai-consistency">
+          <div class="ai-consistency__head">
+            <span class="ai-consistency__label">Consistency across domains</span>
+            <span class="ai-consistency__val">${c}<span class="ai-consistency__unit">/100</span></span>
+          </div>
+          <div class="ai-consistency__track">
+            <div class="ai-consistency__fill" style="width:${c}%"></div>
+          </div>
+        </div>`);
+    }
+
+    return parts.length
+      ? `<div class="ai-analysis">${parts.join("")}</div>`
+      : "";
+  })();
 
   /* Dramatic staged reveal:
      Stage 1 — "Your IQ is…" preamble → number counts up → band → button
      Stage 2 — big stats + description + [Next]
-     Stage 3 — celebrity card + retake */
-  root.innerHTML = `
+     Stage 3 — celebrity card + retake
+     Appended (not replacing) so the analyzer can crossfade out while
+     the reveal screen fades in. */
+  root.insertAdjacentHTML("beforeend", `
     <article class="reveal-screen">
 
       <!-- Full-viewport flash — triggered when the count-up lands -->
@@ -357,27 +659,27 @@ function renderResults({ iq, band, description, person, stats, source }) {
        --><span class="reveal-preamble__word">IQ</span><!--
        --><span class="reveal-preamble__word">is</span>
         </p>
-        <div class="reveal-preamble__dots" aria-hidden="true">
-          <span class="reveal-preamble__dot"></span>
-          <span class="reveal-preamble__dot"></span>
-          <span class="reveal-preamble__dot"></span>
-        </div>
+        <div class="reveal-number-wrap">
+          <div class="reveal-preamble__dots" id="preamble-dots" aria-hidden="true">
+            <span class="reveal-preamble__dot"></span>
+            <span class="reveal-preamble__dot"></span>
+            <span class="reveal-preamble__dot"></span>
+          </div>
 
-        <div class="reveal-number" id="reveal-number" aria-live="polite">
-          <!-- Concentric shockwave rings — expand outward when the number lands -->
+          <div class="reveal-number" id="reveal-number" aria-live="polite">
+          <!-- Shockwave ring — expands outward when the number lands -->
           <span class="reveal-ring" id="ring-1" aria-hidden="true"></span>
-          <span class="reveal-ring" id="ring-2" aria-hidden="true"></span>
-          <span class="reveal-ring" id="ring-3" aria-hidden="true"></span>
           <!-- Particle burst container (spans injected on impact) -->
           <span class="reveal-particles" id="particles" aria-hidden="true"></span>
           <span id="iq-value">0</span>
         </div>
+        </div><!-- /.reveal-number-wrap -->
 
         <p class="reveal-band"><span class="reveal-band__text">${band}</span></p>
         <button class="btn btn--primary reveal-btn" id="show-more">Show more</button>
       </section>
 
-      <!-- STAGE 2: stats -->
+      <!-- STAGE 2: stats + rich AI analysis -->
       <section class="reveal-stage reveal-stage--two" id="rs-stats" hidden>
         <div class="rs-stats-grid">
           <div class="rs-stat">
@@ -396,6 +698,7 @@ function renderResults({ iq, band, description, person, stats, source }) {
           </div>
         </div>
         <p class="reveal-desc">${esc(description)}</p>
+        ${aiBlocks}
         <button class="btn btn--primary" id="show-person">Next</button>
       </section>
 
@@ -410,14 +713,19 @@ function renderResults({ iq, band, description, person, stats, source }) {
       </section>
 
     </article>
-  `;
+  `);
+
+  /* Fade out the placeholder dots just before the number animates in. */
+  setTimeout(() => {
+    document.getElementById("preamble-dots")?.classList.add("reveal-preamble__dots--gone");
+  }, 1300);
 
   /* Start the count-up AFTER the preamble words have all landed and the
-     number element has finished its blur-in (animation-delay 1750ms +
+     number element has finished its blur-in (animation-delay 1450ms +
      enter duration 900ms → the count begins as the number lands). */
   setTimeout(() => {
     dramaticCount(document.getElementById("iq-value"), iq, 2000);
-  }, 1900);
+  }, 1600);
 
   document.getElementById("show-more")?.addEventListener("click", () => {
     /* Smoothly replace stage 1 with stage 2 — not stack */
@@ -501,16 +809,13 @@ function triggerImpact() {
     num.classList.add("reveal-number--impact");
   }
 
-  /* 2. Three shockwave rings — staggered */
-  ["ring-1", "ring-2", "ring-3"].forEach((id, i) => {
-    const r = document.getElementById(id);
-    if (!r) return;
-    setTimeout(() => {
-      r.classList.remove("reveal-ring--burst");
-      void r.offsetWidth;
-      r.classList.add("reveal-ring--burst");
-    }, i * 140);
-  });
+  /* 2. Single shockwave ring */
+  const r = document.getElementById("ring-1");
+  if (r) {
+    r.classList.remove("reveal-ring--burst");
+    void r.offsetWidth;
+    r.classList.add("reveal-ring--burst");
+  }
 
   /* 3. Particle burst — spawn 16 radial particles */
   if (parts) {

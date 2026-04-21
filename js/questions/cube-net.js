@@ -147,7 +147,7 @@ export function generate(rng) {
   return {
     type: "cube-net",
     category: "Cube Net",
-    prompt: "This is an unfolded cube. Which folded cube matches when the net is assembled?",
+    prompt: "This flat shape folds up into a cube. Pick the cube it makes.",
 
     render() {
       const opts = options.map((o, i) => `

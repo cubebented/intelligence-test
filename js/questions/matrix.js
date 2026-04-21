@@ -103,7 +103,7 @@ export function generate(rng) {
   return {
     type: "matrix",
     category: "Matrix Reasoning",
-    prompt: "Select the figure that completes the pattern.",
+    prompt: "Pick the picture that completes the pattern in the empty square.",
 
     render() {
       let grid = "";

@@ -206,7 +206,7 @@ export function generate(rng) {
   return {
     type: "number-sentence",
     category: "Word Problems",
-    prompt: "Read the problem. Work it out.",
+    prompt: "Read the word problem. Work out the answer.",
 
     render() {
       const opts = options.map((text, i) => `

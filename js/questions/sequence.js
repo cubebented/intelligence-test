@@ -196,7 +196,7 @@ export function generate(rng) {
   return {
     type: "sequence",
     category: "Pattern Sequence",
-    prompt: "Click dots on the right grid to draw what Step 4 looks like. The pattern continues consistently.",
+    prompt: "Click dots on the empty grid to draw Step 4. The pattern follows the same rule as Steps 1–3.",
 
     render() {
       const examples = steps.map((s, i) =>

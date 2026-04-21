@@ -45,7 +45,7 @@ export function generate(rng) {
   return {
     type: "analogy",
     category: "Figure Analogy",
-    prompt: "A is to B as C is to ? — pick the figure that applies the same transformation.",
+    prompt: "Look at how picture A changes to B. Apply the same change to C, then pick the answer.",
 
     render() {
       const opts = optionStates.map((s, i) =>

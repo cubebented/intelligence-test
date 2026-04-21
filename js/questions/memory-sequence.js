@@ -39,7 +39,7 @@ export function generate(rng) {
   return {
     type: "memory-sequence",
     category: "Memory Sequence",
-    prompt: "Watch the sequence. You'll be asked which shape appeared in a specific position.",
+    prompt: "Watch the shapes appear one by one. After, you'll pick which shape was at a certain spot.",
 
     render() {
       /* Reel starts with position-numbered placeholder slots — visible frames

@@ -48,8 +48,8 @@ const CIRC = 2 * Math.PI * 15.9; // SVG circle circumference (r=15.9)
 function clearQTimer() {
   clearInterval(state._qTimer);
   state._qTimer = null;
-  /* Reset any lingering timer-state class on body so bg warning clears */
-  document.body.classList.remove("tm-warn", "tm-urgent");
+  /* Reset any lingering timer-state classes on body so bg warning clears */
+  document.body.classList.remove("tm-warn1", "tm-warn2", "tm-urgent");
 }
 
 function startQTimer() {
@@ -72,14 +72,23 @@ function startQTimer() {
     numEl.textContent = secs;
     arcEl.style.strokeDasharray = `${ratio * CIRC} ${CIRC}`;
 
-    const inWarn   = ratio < 0.4 && ratio >= 0.2;
-    const inUrgent = ratio < 0.2;
+    /* Three-tier warning cadence, keyed to ABSOLUTE seconds remaining so it
+       feels the same on every question length:
+          ≤ 20s  → tm-warn1 (yellow)
+          ≤ 10s  → tm-warn2 (orange)
+          ≤  5s  → tm-urgent (red)
+       Intermediate tiers are exclusive — only the most-severe class is on. */
+    const inWarn1  = secs <= 20 && secs > 10;
+    const inWarn2  = secs <= 10 && secs > 5;
+    const inUrgent = secs <= 5  && secs > 0;
 
-    wrap.classList.toggle("qt--warn",   inWarn);
+    /* Per-question timer circle: two visual states (warn/urgent) are enough */
+    wrap.classList.toggle("qt--warn",   inWarn1 || inWarn2);
     wrap.classList.toggle("qt--urgent", inUrgent);
 
-    /* Mirror state onto the body so the background can wash amber/red */
-    document.body.classList.toggle("tm-warn",   inWarn);
+    /* Background-tint tiers on <body> — CSS handles the smooth colour ramp */
+    document.body.classList.toggle("tm-warn1",  inWarn1);
+    document.body.classList.toggle("tm-warn2",  inWarn2);
     document.body.classList.toggle("tm-urgent", inUrgent);
 
     if (remaining <= 0) {
@@ -122,9 +131,9 @@ function renderHeader() {
     <div class="test-header">
       <div class="test-header__row">
         <div class="test-header__meta">
-          Question <strong>${state.index + 1}</strong>
+          <span class="test-header__q-label">Question </span><strong>${state.index + 1}</strong>
           <span class="test-header__sep">/</span>
-          Question <strong>${total}</strong>
+          <strong>${total}</strong>
         </div>
         <div></div>
         ${timer}
@@ -178,6 +187,13 @@ function render() {
   const { q }  = questions[state.index];
   const locked = state.committed[state.index];  // view-only on revisit
   state.startTimes[state.index] = state.startTimes[state.index] || Date.now();
+
+  /* Sweep any floating calculator from a previous series question.
+     The series calculator lives on <body> (see js/questions/series.js for
+     why — transform-based containing-block trap), so swapping #app's
+     innerHTML doesn't remove it. Strip it here before every render; the
+     series question re-creates it from its own template if needed. */
+  document.querySelectorAll("body > .calc").forEach(el => el.remove());
 
   root.innerHTML = `
     <div class="test-shell">

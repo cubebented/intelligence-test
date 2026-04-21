@@ -189,7 +189,7 @@ export function generate(rng) {
   return {
     type: "relationship",
     category: "Relationships",
-    prompt: "Work out the relationship from the statement.",
+    prompt: "Read the sentence carefully. Work out how the people are related.",
 
     render() {
       const opts = options.map((text, i) => `

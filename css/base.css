@@ -49,44 +49,24 @@ body::before {
   z-index: 0;
 }
 
-/* Subtle warm vignette — atmosphere.
-   Also doubles as the TIMER WARNING overlay:
-   when the per-question timer enters warn/urgent state, the body gets
-   `.tm-warn` or `.tm-urgent`, which swaps this vignette to amber/red.
-   Transition is gentle so it washes in gradually as time runs out. */
+/* Timer-warning background tint.
+   The per-question countdown cascades through three tiers based on absolute
+   seconds remaining: 20s → yellow, 10s → orange, 5s → red. The overlay is a
+   FLAT full-screen tint (no radial vignette, no breathing animation) so it
+   just eases from one colour into the next — a smooth, non-theatrical ramp.
+   The background-color transition carries the crossfade between tiers. */
 body::after {
   content: "";
   position: fixed;
   inset: 0;
   pointer-events: none;
   z-index: 0;
-  background:
-    radial-gradient(ellipse 80% 50% at 50% 0%, rgba(196, 121, 90, 0.04), transparent 70%),
-    radial-gradient(ellipse 70% 40% at 50% 100%, rgba(196, 121, 90, 0.02), transparent 70%);
-  transition: background 700ms var(--ease-out);
+  background-color: transparent;
+  transition: background-color 900ms var(--ease-out);
 }
-
-body.tm-warn::after {
-  background:
-    radial-gradient(ellipse 90% 55% at 50% 100%, rgba(200, 154, 90, 0.13), transparent 65%),
-    radial-gradient(ellipse 70% 40% at 50% 0%,   rgba(200, 154, 90, 0.06), transparent 70%);
-}
-
-body.tm-urgent::after {
-  background:
-    radial-gradient(ellipse 110% 70% at 50% 100%, rgba(180, 75, 66, 0.26), transparent 70%),
-    radial-gradient(ellipse 100% 50% at 50% 0%,   rgba(180, 75, 66, 0.16), transparent 65%),
-    radial-gradient(circle   50% 60% at 0%   50%, rgba(180, 75, 66, 0.12), transparent 55%),
-    radial-gradient(circle   50% 60% at 100% 50%, rgba(180, 75, 66, 0.12), transparent 55%);
-  animation: tm-urgent-breathe 1.3s ease-in-out infinite alternate;
-}
-@keyframes tm-urgent-breathe {
-  from { opacity: 0.82; }
-  to   { opacity: 1; }
-}
-@media (prefers-reduced-motion: reduce) {
-  body.tm-urgent::after { animation: none; }
-}
+body.tm-warn1::after  { background-color: rgba(222, 184,  88, 0.08); } /* yellow */
+body.tm-warn2::after  { background-color: rgba(216, 138,  72, 0.12); } /* orange */
+body.tm-urgent::after { background-color: rgba(198,  82,  66, 0.18); } /* red    */
 
 /* Put everything else above the grid */
 body > * { position: relative; z-index: 1; }

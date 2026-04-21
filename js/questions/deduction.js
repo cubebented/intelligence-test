@@ -238,7 +238,7 @@ export function generate(rng) {
   return {
     type: "deduction",
     category: "Deduction",
-    prompt: "Read every clue. Only one answer is consistent.",
+    prompt: "Read every clue. Only one of the choices fits all of them.",
 
     render() {
       const opts = data.options.map((text, i) => `

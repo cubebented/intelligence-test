@@ -109,7 +109,9 @@
   padding: var(--s-4) var(--s-6);
   display: flex;
   justify-content: center;
-  align-items: center;    /* vertical centering fills the grid row */
+  align-items: flex-start; /* flex-start prevents top-overflow behind sticky header */
+  overflow-y: auto;        /* scroll internally if question exceeds 1fr row height */
+  min-height: 0;           /* grid child must opt-in to honour overflow-y */
 }
 
 .question {
@@ -118,6 +120,11 @@
   flex-direction: column;
   align-items: center;
   animation: q-enter 360ms var(--ease-out) both;
+  /* auto top/bottom margins: centres the question in the stage when there
+     is spare space (short questions), but won't push content off the top
+     when the question is taller than the 1fr row (tall anagram / memory). */
+  margin-top: auto;
+  margin-bottom: auto;
 }
 @keyframes q-enter {
   from { opacity: 0; transform: translateY(8px); }
@@ -1089,6 +1096,112 @@
   margin: 0 var(--s-2);
 }
 
+/* ---------- Sentence Completion (fill-in-the-blank) ---------- */
+
+.sc-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-6);
+  max-width: 620px;
+  margin: 0 auto;
+  width: 100%;
+  align-items: center;
+}
+.sc-sentence {
+  font-family: var(--font-display);
+  font-size: var(--fs-md);
+  font-weight: 400;
+  line-height: 1.55;
+  color: var(--text);
+  letter-spacing: -0.005em;
+  text-align: center;
+  padding: var(--s-5) var(--s-6);
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  width: 100%;
+  margin: 0;
+  max-width: none;
+}
+.sc-blank {
+  display: inline-block;
+  min-width: 4.5em;
+  border-bottom: 2px solid var(--accent);
+  color: transparent;           /* hide the placeholder underscore glyphs */
+  margin: 0 0.2em;
+  line-height: 1;
+  font-family: var(--font-mono);
+  letter-spacing: 0;
+  position: relative;
+  top: -0.12em;
+}
+
+/* ---------- Word Match (synonyms, antonyms) ---------- */
+
+.word-match {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-6);
+  max-width: 620px;
+  margin: 0 auto;
+  width: 100%;
+  align-items: center;
+}
+.word-match__target {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--s-2);
+  padding: var(--s-6) var(--s-8);
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  min-width: 240px;
+}
+.word-match__eyebrow {
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.word-match__word {
+  font-family: var(--font-display);
+  font-size: var(--fs-xl);
+  font-weight: 600;
+  color: var(--accent);
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+
+/* ---------- Problem Solving (word problems with numeric answers) ---------- */
+
+.ps-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-5);
+  max-width: 640px;
+  margin: 0 auto;
+  width: 100%;
+  align-items: center;
+}
+.ps-problem {
+  font-family: var(--font-body);
+  font-size: var(--fs-md);
+  font-weight: 400;
+  line-height: 1.6;
+  color: var(--text);
+  letter-spacing: -0.003em;
+  text-align: left;
+  padding: var(--s-5) var(--s-6);
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  width: 100%;
+  margin: 0;
+  max-width: none;
+}
+
 /* ---------- Anagram (open-answer text input) ---------- */
 
 .anagram {
@@ -1904,149 +2017,195 @@
 
 /* ─── Analyzer overlay ─── */
 
-.analyzer {
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: var(--s-5);
-  padding: var(--s-6);
-  position: relative;
-  animation: analyzer-in 600ms var(--ease-out) both;
-}
-
-/* Edge-glow: a soft accent-tinted vignette that pulses at the four sides
-   of the viewport. Makes the "waiting for IQ" moment feel cinematic. */
-.analyzer__edge-glow {
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: -1;
-  background:
-    radial-gradient(ellipse 70% 35% at 50% 0%,   rgba(196, 121, 90, 0.14), transparent 72%),
-    radial-gradient(ellipse 70% 35% at 50% 100%, rgba(196, 121, 90, 0.14), transparent 72%),
-    radial-gradient(ellipse 35% 70% at 0% 50%,   rgba(196, 121, 90, 0.08), transparent 72%),
-    radial-gradient(ellipse 35% 70% at 100% 50%, rgba(196, 121, 90, 0.08), transparent 72%);
-  animation: analyzer-edge 3.6s var(--ease-in-out) infinite alternate;
-  opacity: 0.9;
-}
-@keyframes analyzer-edge {
-  from { opacity: 0.35; filter: blur(0px); }
-  to   { opacity: 1;    filter: blur(4px); }
-}
-@media (prefers-reduced-motion: reduce) {
-  .analyzer__edge-glow { animation: none; }
-}
 @keyframes analyzer-in {
   from { opacity: 0; }
   to   { opacity: 1; }
 }
 .analyzer--exit {
-  animation: analyzer-out 420ms var(--ease-in) forwards;
+  animation: analyzer-out 650ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  pointer-events: none;
 }
 @keyframes analyzer-out {
-  from { opacity: 1; }
-  to   { opacity: 0; transform: scale(0.98); }
+  from { opacity: 1; filter: blur(0);   transform: scale(1);    }
+  to   { opacity: 0; filter: blur(6px); transform: scale(0.98); }
 }
 
-.analyzer__visual {
-  width: clamp(140px, 18vw, 180px);
-  height: auto;
-  display: block;
-}
-.analyzer__ring {
-  fill: none;
-  stroke: var(--border-strong);
-  stroke-width: 1;
-  transform-box: fill-box;
-  transform-origin: center;
-}
-.analyzer__ring--outer {
-  stroke: var(--accent-dim);
-  stroke-width: 1.2;
-  stroke-dasharray: 5 9;
-  animation: ana-spin 9s linear infinite;
-}
-.analyzer__ring--mid {
-  stroke: var(--hairline-strong);
-  animation: ana-fade 2.8s var(--ease-in-out) infinite;
-}
-.analyzer__ring--inner {
-  stroke: var(--accent);
-  stroke-width: 1.4;
-  animation: ana-breathe 2.2s var(--ease-in-out) infinite;
-}
-.analyzer__core {
-  fill: var(--accent);
-  transform-box: fill-box;
-  transform-origin: center;
-  animation: ana-fade 1.6s var(--ease-in-out) infinite;
-}
-.analyzer__orbit {
-  transform-box: fill-box;
-  transform-origin: 70px 70px;
-  animation: ana-spin 3.2s linear infinite;
-}
-.analyzer__orbit circle {
-  fill: var(--accent);
-  filter: drop-shadow(0 0 6px rgba(196, 121, 90, 0.55));
-}
-.analyzer__ticks line {
-  stroke: var(--text-faint);
-  stroke-width: 1;
-}
-@keyframes ana-spin {
-  from { transform: rotate(0deg); }
-  to   { transform: rotate(360deg); }
-}
-@keyframes ana-breathe {
-  0%, 100% { transform: scale(1);    opacity: 1; }
-  50%      { transform: scale(1.09); opacity: 0.55; }
-}
-@keyframes ana-fade {
-  0%, 100% { opacity: 1; }
-  50%      { opacity: 0.35; }
+.analyzer {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  padding: var(--s-8) var(--s-10);
+  background: var(--bg-solid);
+  animation: analyzer-in 600ms var(--ease-out) both;
+  z-index: 10;
 }
 
-.analyzer__label {
+/* Inherit the same drafting grid that the landing/test pages have —
+   two linear gradients ruled at var(--grid-size) with strong lines
+   every 4th cell, softly masked from the edges. */
+.analyzer::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(to right,  var(--grid-color)  1px, transparent 1px),
+    linear-gradient(to bottom, var(--grid-color)  1px, transparent 1px),
+    linear-gradient(to right,  var(--grid-strong) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--grid-strong) 1px, transparent 1px);
+  background-size:
+    var(--grid-size) var(--grid-size),
+    var(--grid-size) var(--grid-size),
+    calc(var(--grid-size) * 4) calc(var(--grid-size) * 4),
+    calc(var(--grid-size) * 4) calc(var(--grid-size) * 4);
+  mask-image: radial-gradient(ellipse at center, black 35%, transparent 92%);
+  z-index: 0;
+}
+
+.analyzer > * { position: relative; z-index: 1; }
+
+.analyzer__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.analyzer__eyebrow,
+.analyzer__counter {
   font-family: var(--font-mono);
   font-size: var(--fs-xs);
   letter-spacing: 0.28em;
   text-transform: uppercase;
   color: var(--text-muted);
-  margin-top: var(--s-4);
 }
+
+.analyzer__eyebrow::before {
+  content: "";
+  display: inline-block;
+  width: 28px;
+  height: 1px;
+  background: var(--accent);
+  vertical-align: middle;
+  margin-right: 12px;
+  margin-bottom: 3px;
+}
+
+.analyzer__stage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s-8);
+  min-height: 0;
+}
+
+.analyzer__viz {
+  width: clamp(240px, 32vw, 340px);
+  height: auto;
+  display: block;
+}
+
+/* ─── Blueprint viz choreography ───
+   Timeline (~7s total, matches 6-phase calibrate):
+     0.0 – 0.6s   Intro:   corner brackets stagger in
+     0.3 – 1.2s   Intro:   axis / grid fade in
+     0.5 – 1.7s   Intro:   bell curve stroke draws
+     1.3 – 5.8s   Active:  calibrator sweeps, two slow oscillations, settles
+     5.8 – 6.6s   Outro:   final lock-in pulse on dot
+--- */
+
+/* Intro — corner brackets fade in */
+.ana-bracket {
+  opacity: 0;
+  animation: ana-fade-in 420ms var(--ease-out) forwards;
+  animation-delay: calc(var(--i) * 90ms);
+}
+
+/* Intro — axis, grid, labels */
+.ana-axis,
+.ana-grid line,
+.ana-labels text {
+  opacity: 0;
+  animation: ana-fade-in 520ms var(--ease-out) 400ms forwards;
+}
+.ana-grid line { animation-delay: 520ms; }
+.ana-labels text { animation-delay: 700ms; }
+
+@keyframes ana-fade-in { to { opacity: 1; } }
+
+/* Bell curve draws in with a long, smooth easing */
+.ana-curve {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: ana-draw 1.2s cubic-bezier(0.22, 1, 0.36, 1) 500ms forwards;
+}
+@keyframes ana-draw { to { stroke-dashoffset: 0; } }
+
+/* Calibrator slides in from offscreen, then sweeps.
+   Two gentle oscillations, then settles. No sharp direction flips. */
+.ana-cal {
+  opacity: 0;
+  transform: translateX(-20px);
+  animation:
+    ana-cal-in 600ms var(--ease-out) 1100ms forwards,
+    ana-calibrate 4.4s cubic-bezier(0.37, 0, 0.27, 1) 1700ms forwards;
+  will-change: transform, opacity;
+}
+@keyframes ana-cal-in {
+  to { opacity: 1; transform: translateX(36px); }
+}
+@keyframes ana-calibrate {
+  0%   { transform: translateX(36px);  }
+  28%  { transform: translateX(198px); }
+  56%  { transform: translateX(78px);  }
+  100% { transform: translateX(158px); }
+}
+
+/* Outro — dot locks in with a brief glow pulse when calibrator rests */
+.ana-cal-dot {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: ana-lock 900ms cubic-bezier(0.22, 1.4, 0.36, 1) 6100ms forwards;
+}
+@keyframes ana-lock {
+  0%   { transform: scale(1);    filter: drop-shadow(0 0 0 rgba(196, 121, 90, 0)); }
+  40%  { transform: scale(1.6);  filter: drop-shadow(0 0 12px rgba(196, 121, 90, 0.9)); }
+  100% { transform: scale(1.15); filter: drop-shadow(0 0 6px  rgba(196, 121, 90, 0.6)); }
+}
+
 .analyzer__phase {
   font-family: var(--font-display);
-  font-size: var(--fs-lg);
+  font-size: clamp(1.4rem, 3vw, 2rem);
+  font-weight: 300;
   color: var(--text);
-  letter-spacing: -0.01em;
+  letter-spacing: -0.02em;
   line-height: 1.2;
   text-align: center;
-  max-width: 32ch;
-  min-height: 1.2em;
   margin: 0;
-  transition: opacity 280ms var(--ease-out);
+  will-change: opacity, filter, transform;
 }
-.analyzer__progress {
-  width: clamp(180px, 22vw, 260px);
-  height: 2px;
-  background: var(--border);
-  border-radius: var(--r-full);
-  overflow: hidden;
-  margin-top: var(--s-3);
+.analyzer__phase--out {
+  animation: phase-out 240ms cubic-bezier(0.4, 0, 1, 1) forwards;
 }
-.analyzer__progress-fill {
-  height: 100%;
-  background: var(--accent);
-  transform: scaleX(0);
-  transform-origin: left center;
-  transition: transform 700ms var(--ease-out);
+.analyzer__phase--in {
+  animation: phase-in 520ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+@keyframes phase-out {
+  from { opacity: 1; filter: blur(0);    transform: translateY(0); }
+  to   { opacity: 0; filter: blur(6px);  transform: translateY(-6px); }
+}
+@keyframes phase-in {
+  from { opacity: 0; filter: blur(10px); transform: translateY(8px); }
+  to   { opacity: 1; filter: blur(0);    transform: translateY(0); }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .analyzer__ring, .analyzer__core, .analyzer__orbit { animation: none !important; }
+  .ana-curve, .ana-cal, .ana-cal-dot, .ana-bracket,
+  .ana-axis, .ana-grid line, .ana-labels text { animation: none !important; }
+  .ana-curve { stroke-dashoffset: 0; }
+  .ana-cal   { transform: translateX(158px); opacity: 1; }
+  .ana-bracket, .ana-axis, .ana-grid line, .ana-labels text { opacity: 1; }
 }
 
 /* ─── Empty state ─── */
@@ -2077,15 +2236,38 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 .reveal-screen {
-  min-height: 100vh;
+  /* Fixed so it overlays the analyzer as a true cross-dissolve —
+     both screens occupy the same visual plane and fade simultaneously.
+     Without this the reveal-screen sits hidden in normal flow beneath
+     the fixed analyzer and the words "pop" in only after it's gone. */
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  background: var(--bg-solid);
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  /* flex-start + margin:auto on stages means short stages stay visually
+     centred, but tall stages (stats with full AI analysis) scroll from the
+     top instead of being clipped above/below by justify-content: center. */
+  justify-content: flex-start;
+  overflow-y: auto;
   text-align: center;
   padding: var(--s-8) var(--s-6);
-  width: 100%;
   gap: var(--s-8);
+  /* Fade in over the analyzer — the shared dark background makes this
+     feel like a single-surface dissolve rather than a hard swap.
+     Linear easing so the background reaches full opacity quickly and
+     the words inside it have a consistent, visible parent to animate into. */
+  opacity: 0;
+  animation: reveal-screen-enter 350ms linear forwards;
+}
+/* Each stage self-centers when space allows (auto margins collapse to 0
+   once content exceeds viewport height — then it just scrolls from top). */
+.reveal-stage { margin: auto 0; }
+@keyframes reveal-screen-enter {
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 
 .reveal-stage {
@@ -2135,7 +2317,7 @@
   display: inline-flex;
   align-items: center;
   gap: 0.35em;
-  animation: preamble-breathe 4.8s ease-in-out 1600ms infinite alternate;
+  animation: preamble-breathe 4.8s ease-in-out 1300ms infinite alternate;
 }
 .reveal-preamble__word {
   display: inline-block;
@@ -2145,9 +2327,9 @@
   animation: preamble-word-in 900ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
   will-change: opacity, filter, transform;
 }
-.reveal-preamble__word:nth-of-type(1) { animation-delay: 300ms; }
-.reveal-preamble__word:nth-of-type(2) { animation-delay: 500ms; }
-.reveal-preamble__word:nth-of-type(3) { animation-delay: 700ms; }
+.reveal-preamble__word:nth-of-type(1) { animation-delay: 0ms;   }
+.reveal-preamble__word:nth-of-type(2) { animation-delay: 180ms; }
+.reveal-preamble__word:nth-of-type(3) { animation-delay: 360ms; }
 
 @keyframes preamble-word-in {
   to { opacity: 1; filter: blur(0); transform: translateY(0); }
@@ -2157,16 +2339,32 @@
   to   { opacity: 1;    }
 }
 
+/* Wrapper that stacks the dots and the number in the same grid cell */
+.reveal-number-wrap {
+  display: grid;
+  place-items: center;
+}
+.reveal-number-wrap .reveal-preamble__dots,
+.reveal-number-wrap .reveal-number {
+  grid-area: 1 / 1;
+}
+
 /* Ellipsis dots — pulse one at a time to suggest "thinking / building up".
-   Sit on their own row BELOW the "Your IQ is" phrase. */
+   Overlaid on the number position via the grid wrapper. */
 .reveal-preamble__dots {
   display: flex;
   gap: 8px;
   justify-content: center;
   align-items: center;
   opacity: 0;
-  animation: preamble-dots-in 400ms var(--ease-out) 950ms forwards;
-  margin-top: var(--s-3);
+  animation: preamble-dots-in 400ms var(--ease-out) 650ms forwards;
+  transition: opacity 350ms ease;
+  pointer-events: none;
+  z-index: 5;
+}
+.reveal-preamble__dots--gone {
+  opacity: 0 !important;
+  animation: none !important;
 }
 .reveal-preamble__dot {
   width: 7px;
@@ -2197,7 +2395,7 @@
   position: relative;
   padding: 0 0.1em;
   opacity: 0;
-  animation: number-in 900ms var(--ease-out) 1750ms forwards;
+  animation: number-in 900ms var(--ease-out) 1450ms forwards;
   filter: drop-shadow(0 8px 80px rgba(196, 121, 90, 0.32));
   /* Must be positioned so the absolutely-positioned effect children
      (rings, particles, flash origin) center on the number. */
@@ -2354,38 +2552,23 @@
   line-height: 1;
   margin: 0;
   position: relative;
-  padding-bottom: 14px;
 }
 .reveal-band__text {
   display: inline-block;
   opacity: 0;
   letter-spacing: 0.35em;
   transform: translateY(16px);
-  animation: band-text-in 900ms cubic-bezier(0.22, 1, 0.36, 1) 4050ms forwards;
-}
-.reveal-band::after {
-  content: "";
-  position: absolute;
-  left: 50%;
-  bottom: 0;
-  width: 0;
-  height: 2px;
-  background: linear-gradient(90deg, transparent, var(--accent), transparent);
-  transform: translateX(-50%);
-  animation: band-underline 800ms cubic-bezier(0.22, 1, 0.36, 1) 4500ms forwards;
+  animation: band-text-in 900ms cubic-bezier(0.22, 1, 0.36, 1) 3750ms forwards;
 }
 @keyframes band-text-in {
   to { opacity: 1; letter-spacing: -0.03em; transform: translateY(0); }
 }
-@keyframes band-underline {
-  to { width: 140px; }
-}
 
 .reveal-btn {
-  margin-top: var(--s-6);
+  margin-top: var(--s-3);
   min-width: 180px;
   opacity: 0;
-  animation: fade-up 700ms var(--ease-out) 4550ms forwards;
+  animation: fade-up 700ms var(--ease-out) 4250ms forwards;
 }
 
 /* Stage 2 — description sits UNDER the big stats */
@@ -2395,6 +2578,200 @@
   margin: 0 auto;
   line-height: 1.55;
   font-size: var(--fs-md);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   AI analysis blocks (stage 2) — rich card read of the session.
+   Each block renders only when the model returns its field, so layout is
+   resilient to partial responses. Everything is left-aligned inside a
+   centered 640-px column — reads like a tiny report card, not a hero.
+   ═══════════════════════════════════════════════════════════════════════ */
+.ai-analysis {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-5);
+  width: 100%;
+  max-width: 640px;
+  margin: var(--s-4) auto 0;
+  text-align: left;
+}
+
+/* Cognitive-style pill — small header-style meta row */
+.ai-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: var(--s-3) 0;
+  border-bottom: 1px solid var(--border);
+  gap: var(--s-4);
+}
+.ai-meta__k {
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.ai-meta__v {
+  font-family: var(--font-display);
+  font-size: var(--fs-md);
+  color: var(--accent);
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+
+/* Strongest / weakest domain cards — two-up grid */
+.ai-domains {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--s-3);
+}
+.ai-domain {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: var(--s-4);
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+}
+.ai-domain__label {
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.ai-domain--up   .ai-domain__label { color: var(--ok); }
+.ai-domain--down .ai-domain__label { color: var(--warn); }
+.ai-domain__name {
+  font-family: var(--font-display);
+  font-size: var(--fs-md);
+  color: var(--text);
+  font-weight: 500;
+  letter-spacing: -0.005em;
+}
+
+/* Strength / growth-area bullet lists */
+.ai-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+}
+.ai-list__label {
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+.ai-list--growth .ai-list__label { color: var(--warn); }
+.ai-list__items {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.ai-list__items li {
+  padding-left: var(--s-4);
+  position: relative;
+  color: var(--text-secondary);
+  font-size: var(--fs-sm);
+  line-height: 1.5;
+}
+.ai-list__items li::before {
+  content: "";
+  position: absolute;
+  left: 4px;
+  top: 0.65em;
+  width: 6px;
+  height: 1px;
+  background: var(--accent-dim);
+}
+.ai-list--growth .ai-list__items li::before { background: var(--warn); }
+
+/* Insight blocks (timing + notable pattern) — left-rule callouts */
+.ai-insight {
+  padding: var(--s-3) var(--s-4);
+  border-left: 2px solid var(--border-strong);
+}
+.ai-insight--notable { border-left-color: var(--accent); }
+.ai-insight__label {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.ai-insight--notable .ai-insight__label { color: var(--accent); }
+.ai-insight__text {
+  margin: 6px 0 0;
+  color: var(--text);
+  font-size: var(--fs-sm);
+  line-height: 1.55;
+  max-width: none;              /* override the 65ch default on p */
+}
+
+/* Consistency meter — horizontal bar beneath the numeric readout */
+.ai-consistency {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  padding-top: var(--s-4);
+  border-top: 1px solid var(--border);
+}
+.ai-consistency__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--s-3);
+}
+.ai-consistency__label {
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.ai-consistency__val {
+  font-family: var(--font-display);
+  font-size: var(--fs-lg);
+  font-weight: 500;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+.ai-consistency__unit {
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+  margin-left: 2px;
+  letter-spacing: 0;
+}
+.ai-consistency__track {
+  height: 3px;
+  background: var(--border);
+  border-radius: var(--r-full);
+  overflow: hidden;
+}
+.ai-consistency__fill {
+  height: 100%;
+  /* width is set inline via style="width:${c}%" — animation here is the
+     appearance only: scale from 0 → 1 along the x-axis so the bar fills in. */
+  background: linear-gradient(90deg, var(--accent-dim), var(--accent));
+  transform-origin: left center;
+  animation: ai-consistency-fill 900ms var(--ease-out) 300ms both;
+}
+@keyframes ai-consistency-fill {
+  from { transform: scaleX(0); }
+  to   { transform: scaleX(1); }
+}
+
+@media (max-width: 560px) {
+  .ai-domains { grid-template-columns: 1fr; }
+  .ai-meta { flex-direction: column; align-items: flex-start; gap: var(--s-1); }
 }
 
 /* Stage 3 — celebrity framing */
@@ -2594,4 +2971,152 @@
   color: var(--text-faint);
   text-align: center;
   margin-top: 0;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   MOBILE — phones (≤640px)
+   Desktop layout is intentionally untouched. This block only:
+     • tightens header/footer chrome so the question gets real estate,
+     • hides non-actionable meta (SEED, keyboard hints) on touch,
+     • rescales question-type UIs that otherwise require awkward scrolling
+       or have tap targets too small / too large.
+   ═══════════════════════════════════════════════════════════════════════ */
+@media (max-width: 640px) {
+
+  /* ── Header: compact padding, smaller meta, drop the "Question " prefix
+        on the running number (the progress row below already gives context). */
+  .test-header {
+    padding: var(--s-3) var(--s-4);
+  }
+  .test-header__row {
+    gap: var(--s-3);
+    margin-bottom: var(--s-2);
+  }
+  .test-header__meta {
+    font-size: 11px;
+    letter-spacing: 0.08em;
+  }
+  .test-header__q-label { display: none; }
+  .test-header__sep { margin: 0 var(--s-1); }
+
+  /* ── Footer: hide the seed + keyboard hints (nothing to tap), centre the
+        nav buttons, and enlarge tap targets to the 44-px accessibility floor. */
+  .test-footer {
+    padding: var(--s-3) var(--s-4);
+    gap: var(--s-2);
+  }
+  .test-footer__hint { display: none; }
+  .test-footer .flex {
+    width: 100%;
+    gap: var(--s-2);
+  }
+  .test-footer .btn {
+    padding: 12px 14px;
+    min-height: 44px;
+    font-size: var(--fs-xs);
+    flex: 1;                 /* buttons share footer width evenly */
+  }
+  /* Primary button earns a little more weight on mobile — it's the main CTA */
+  .test-footer .btn--primary { flex: 1.4; }
+
+  /* ── Stage / question: tighter chrome so more of the answer area is visible */
+  .stage {
+    padding: var(--s-3);
+  }
+  .question__header {
+    margin-bottom: var(--s-3);
+  }
+  .question__prompt {
+    font-size: var(--fs-base);
+    line-height: 1.45;
+  }
+  .question__canvas {
+    padding: var(--s-5) var(--s-3);
+    margin-bottom: var(--s-2);
+  }
+
+  /* ── Memory Path (Corsi "click the dots") — primary offender.
+        Shrink the preview and grid so the whole question fits in-viewport. */
+  .mem-wrap { gap: var(--s-3); }
+  .mem-phase {
+    gap: var(--s-2);
+    font-size: 10px;
+    letter-spacing: 0.12em;
+  }
+  .mem-phase__bar { width: 72px; }
+  .mem-preview {
+    gap: var(--s-3);
+    padding: var(--s-2) var(--s-2);
+  }
+  .mem-preview__hint {
+    font-size: var(--fs-xs);
+    max-width: 28ch;
+  }
+  .mem-preview__grid {
+    width: 120px;
+    gap: 8px;
+    padding: 8px;
+  }
+  .mem-countdown { margin-top: 0; }
+  .mem-countdown__num { font-size: clamp(2.4rem, 13vw, 3.4rem); }
+
+  .mem-path-grid {
+    max-width: 260px;
+    gap: 8px;
+    padding: 10px;
+  }
+
+  /* ── Memory Grid (5×5) — same treatment, slightly tighter cells */
+  .mem-grid {
+    max-width: 300px;
+    gap: 4px;
+    padding: 8px;
+  }
+
+  /* ── Memory Sequence reel — shrink slots so the full row fits */
+  .mem-reel { gap: var(--s-2); min-height: 72px; }
+  .mem-reel__slot { width: 60px; height: 60px; }
+
+  /* ── Anagram: 60-px tiles crowd the canvas and wrap awkwardly on phones */
+  .anagram {
+    gap: var(--s-5);
+    padding: var(--s-2) 0;
+  }
+  .anagram__scramble { gap: var(--s-2); }
+  .anagram__letter {
+    width: 46px;
+    height: 46px;
+    font-size: var(--fs-lg);
+  }
+  .input--text { font-size: var(--fs-md); padding: var(--s-3); }
+
+  /* ── Paper folding steps — 120-px squares eat almost half the viewport */
+  .fold-sequence { gap: var(--s-2); }
+  .fold-step {
+    width: 84px;
+    height: 84px;
+    padding: 6px;
+  }
+
+  /* ── Cube net preview — cap visual at a phone-friendly size */
+  .net-display { padding: var(--s-2); }
+  .net-display svg { max-width: 260px; }
+
+  /* ── Draw-sequence dots: the visible r=3.2 circles are unhittable by a
+        fingertip. Expand the hit area via an invisible stroke (pointer-events:
+        all makes transparent strokes responsive). Visual stays identical. */
+  .draw-dot {
+    stroke: transparent;
+    stroke-width: 20;
+    pointer-events: all;
+  }
+}
+
+/* Smallest phones (<380px) — one more tightening pass */
+@media (max-width: 380px) {
+  .anagram__letter { width: 40px; height: 40px; font-size: var(--fs-md); }
+  .fold-step { width: 72px; height: 72px; }
+  .mem-path-grid { max-width: 230px; gap: 6px; padding: 8px; }
+  .mem-grid { max-width: 270px; }
+  .test-footer .btn { padding: 10px 10px; }
 }

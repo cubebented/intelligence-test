@@ -97,7 +97,7 @@ export function generate(rng) {
   return {
     type: "odd-one",
     category: "Odd One Out",
-    prompt: "Four of these share a property. Click the one that doesn't belong.",
+    prompt: "Four of these are alike in one way. Click the one that doesn't fit.",
 
     render() {
       const cells = items.map((s, i) =>

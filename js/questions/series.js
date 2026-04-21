@@ -249,6 +249,22 @@ function wireCalculator(root) {
   const bar     = root.querySelector("#calc-bar");
   if (!calc || !display || !bar) return;
 
+  /* Reparent the calculator to <body> before wiring events.
+     Why: `.question` runs `animation: q-enter both`, which leaves a
+     persistent `transform: translateY(0)` on it. Any non-`none` transform
+     on an ancestor turns that ancestor into the containing block for
+     `position: fixed` descendants, which means `getBoundingClientRect()`
+     (viewport coords) and `style.left/top` (ancestor-local coords) no
+     longer agree — producing the "teleport on first drag" bug.
+     Living at <body> neutralises every such ancestor. */
+  if (calc.parentNode !== document.body) {
+    /* Remove any stale calculator left over from a prior series render */
+    document.querySelectorAll("body > .calc").forEach(el => {
+      if (el !== calc) el.remove();
+    });
+    document.body.appendChild(calc);
+  }
+
   /* Expression editor — stores the literal string we show */
   let expr = "";
 

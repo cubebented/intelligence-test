@@ -108,7 +108,7 @@ export function generate(rng) {
   return {
     type: "verbal-analogy",
     category: "Verbal Analogy",
-    prompt: "Pick the word that completes the analogy.",
+    prompt: "Pick the word that finishes the second pair the same way as the first.",
 
     render() {
       const opts = options.map((word, i) => `
