@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>An intelligence test</title>
-  <meta name="description" content="Twenty timed problems. One minute each. Visual, verbal, memory, logic, word problems." />
+  <meta name="description" content="Twenty problems, one minute each. Questions adapt to your age — from arithmetic and sequences to classic IQ-test trick questions." />
   <meta name="color-scheme" content="dark" />
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='10' fill='none' stroke='%23c4795a' stroke-width='2'/%3E%3Ccircle cx='12' cy='12' r='3' fill='%23c4795a'/%3E%3C/svg%3E" />
 
@@ -35,12 +35,22 @@
         </h1>
 
         <p class="landing__subtitle reveal" style="--i:1;">
-          Twenty timed problems. One minute each. Visual, verbal, memory, logic, word problems.
+          Twenty problems, one minute each. Questions adapt to your age — arithmetic, sequences, analogies, and classic IQ trick questions.
         </p>
 
 
+        <div class="landing__age reveal" style="--i:2;">
+          <label class="landing__age-label" for="age-input">Your age</label>
+          <div class="landing__age-row">
+            <input type="number" id="age-input" class="landing__age-input"
+                   min="8" max="99" step="1" inputmode="numeric"
+                   placeholder="14" autocomplete="off" />
+            <span class="landing__age-hint" id="age-hint">Questions adapt to your age.</span>
+          </div>
+        </div>
+
         <div class="landing__cta reveal" style="--i:3;">
-          <button class="btn btn--primary" id="start-btn">
+          <button class="btn btn--primary" id="start-btn" disabled>
             Begin assessment
           </button>
           <input type="hidden" id="seed-input" maxlength="7" />

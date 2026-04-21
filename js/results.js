@@ -14,29 +14,19 @@ const DEEPSEEK_URL     = "https://api.deepseek.com/chat/completions";
 const DEEPSEEK_MODEL   = "deepseek-chat";
 const API_TIMEOUT_MS   = 14000;   /* deeper analysis + 900-token ceiling → allow more wall-clock */
 
+/* Category → cognitive-domain grouping, used by the AI analyst to spot
+   per-domain patterns. Matches the CATEGORY names in questions/problem.js. */
 const DOMAINS = {
-  "Number Series":        "Fluid Reasoning",
-  "Matrix Reasoning":     "Fluid Reasoning",
-  "Pattern Sequence":     "Fluid Reasoning",
-  "Word Problems":        "Fluid Reasoning",
-  "Problem Solving":      "Fluid Reasoning",
-  "Paper Folding":        "Spatial",
-  "Cube Net":             "Spatial",
-  "Figure Analogy":       "Pattern Recognition",
-  "Odd One Out":          "Pattern Recognition",
-  "Hidden Figure":        "Pattern Recognition",
-  "Memory Grid":          "Working Memory",
-  "Memory Sequence":      "Working Memory",
-  "Memory Path":          "Working Memory",
-  "Logic Puzzle":         "Verbal Reasoning",
-  "Verbal Analogy":       "Verbal Reasoning",
-  "Coding & Decoding":    "Verbal Reasoning",
-  "Deduction":            "Verbal Reasoning",
-  "Relationships":        "Verbal Reasoning",
-  "Anagram":              "Verbal Reasoning",
-  "Sentence Completion":  "Verbal Reasoning",
-  "Synonyms":             "Verbal Reasoning",
-  "Antonyms":             "Verbal Reasoning",
+  "Arithmetic":       "Numerical Reasoning",
+  "Word Problem":     "Numerical Reasoning",
+  "Number Sequence":  "Fluid Reasoning",
+  "Letter Sequence":  "Fluid Reasoning",
+  "Pattern Code":     "Fluid Reasoning",
+  "Analogy":          "Verbal Reasoning",
+  "Odd One Out":      "Pattern Recognition",
+  "Trick Question":   "Careful Reading",
+  "Deduction":        "Logical Reasoning",
+  "Time & Age":       "Numerical Reasoning",
 };
 
 /* ─── Famous people / descriptors by IQ bucket (rounded to 5) ─── */
@@ -165,7 +155,6 @@ async function boot(report) {
     description: (ai && ai.description) || defaultDescription(finalIQ),
     person:      personForIQ(finalIQ),
     stats,
-    ai,                                    // full AI analysis object (may be null)
     source:      ai ? "ai" : "local",
   });
 
@@ -294,92 +283,53 @@ async function callDeepSeek(report, stats) {
   };
 
   const system = `You are a senior cognitive-assessment analyst. You review a
-completed IQ-test session and produce a deep, honest, specific analysis in
-JSON. Return ONLY the JSON object — no markdown, no prose outside the JSON.
+completed IQ-test session and write a short, honest analysis. The analysis
+STILL needs to be deep — look for patterns, not just "you got X out of Y".
+But the surface you return is a single clean paragraph that a parent or
+teenager can read in 20 seconds. Return ONLY JSON — no markdown, no prose
+outside the JSON.
 
-The test covers FIVE cognitive domains:
-  • Fluid Reasoning — Number Series, Matrix Reasoning, Pattern Sequence,
-    Word Problems, Problem Solving
-  • Spatial         — Paper Folding, Cube Net
-  • Pattern Recognition — Figure Analogy, Odd One Out, Hidden Figure
-  • Working Memory  — Memory Grid, Memory Sequence, Memory Path
-  • Verbal Reasoning — Logic Puzzle, Verbal Analogy, Coding & Decoding,
-    Deduction, Relationships, Anagram, Sentence Completion, Synonyms, Antonyms
+The test is 20 timed multiple-choice problems, 60 seconds each, covering:
+arithmetic, number sequences, logical deduction, verbal analogies, classic
+IQ-test trick questions, time/age/money puzzles, and pattern recognition.
 
-Every question has a 60-second limit. Items are scored correct / incorrect /
-skipped / timedOut, with per-item elapsed time.
+═══ HOW TO THINK ═══
+Internally, consider:
+  • Timing signature — did they rush (<30% time on most correct items),
+    work deliberately (60%+), or run out of time often?
+  • Where they slipped — were the misses on trick questions (read too fast),
+    arithmetic (calc errors), or abstract reasoning (genuinely tough)?
+  • Ceiling pattern — nailing the hardest items while missing easy ones
+    suggests attention or rush, not ability.
+  • Skip vs. timed-out vs. wrong — each has a different interpretation.
 
-═══ HOW TO ANALYSE ═══
-Do not just describe the score — identify PATTERNS. Look for:
-
-1. Domain-skew: which domains stand clearly above / below this person's
-   own average? (Use byDomain accuracies.)
-2. Timing signature:
-     — "rushed" = most correct items used <35% of time
-     — "deliberate" = most correct items used 60%+ of time
-     — "timed-out" = answered close to the buzzer often
-3. Knowledge-vs-reasoning: verbal domains lean vocabulary (knowledge);
-   fluid/spatial lean reasoning. A wide gap is diagnostic.
-4. Ceiling pattern: if they got all the hardest items (matrix, deduction,
-   sequence) but missed an easy one (anagram), that's signal — maybe tired
-   or rushed early, not a lack of ability.
-5. Error type: skip = gave up; timed-out = couldn't finish; wrong = tried
-   and failed. Each has a different interpretation.
-6. Consistency: are accuracies even across domains, or spiky?
+Do not output any of this reasoning separately. Distil it into ONE paragraph.
 
 ═══ RESPONSE SCHEMA ═══
 {
-  "iqAdjustment": number,       // integer in [-8, +8]. Apply to raw IQ based
-                                // on pattern nuance. + for: nailed hardest
-                                // items, correct-while-timed-out (knew it,
-                                // ran out of time), strong under-time usage.
-                                // − for: lucky distribution, skipped easy
-                                // items, "all surface, no depth" pattern.
-                                // 0 if truly nothing stands out.
-  "description": string,         // 2–3 sentences, ≤ 55 words total. Lead
-                                // with the single most specific observation
-                                // you can defend from the data. No clichés,
-                                // no "great job", no disclaimers, no
-                                // "overall you scored X". Concrete nouns.
-  "cognitiveStyle": string,      // 2–4 words describing their approach,
-                                // e.g. "Fast intuitive", "Deliberate
-                                // analytical", "Methodical but hesitant",
-                                // "Pattern-first thinker".
-  "strongestDomain": string,     // The cognitive-domain name (from the five
-                                // above) where they performed best relative
-                                // to their own average — not absolute.
-  "weakestDomain": string,       // Same, but weakest relative to own avg.
-                                // If all domains are within 10% of each
-                                // other, pick the one with lowest accuracy.
-  "strengths": string[],         // 2–3 short phrases (≤ 8 words each)
-                                // describing concrete strengths, e.g.
-                                // "Quick pattern recognition under pressure",
-                                // "Strong vocabulary depth", "Spatial
-                                // visualisation". Ground in the data.
-  "growthAreas": string[],       // 1–2 short phrases (≤ 8 words each) of
-                                // honest growth areas. Not harsh — framed
-                                // as "room to grow", not "you suck at X".
-  "timePattern": string,         // ONE sentence describing their time usage
-                                // across the test. Be specific: "Used ~55%
-                                // of available time on correct items — an
-                                // efficient, confident pace."
-  "notablePattern": string,      // ONE sentence calling out the single most
-                                // INTERESTING behavioural signal — the thing
-                                // you'd mention to them if you had 10 seconds.
-                                // E.g. "Every timed-out question was a
-                                // memory task — working-memory span seems
-                                // to be the limiter, not reasoning."
-  "consistencyScore": number     // 0–100. 100 = identical accuracy across
-                                // all domains; 0 = wildly uneven. Computed
-                                // as 100 minus the std-dev of per-domain
-                                // accuracies, roughly.
+  "iqAdjustment": number,       // integer in [-8, +8]. Nudge the raw IQ based
+                                // on pattern nuance: + for nailing the hardest
+                                // items or correct-while-timed-out; − for a
+                                // scattered / lucky pattern. 0 if nothing
+                                // stands out.
+  "description": string         // 3–5 sentences, ≤ 85 words total, written
+                                // as a single flowing paragraph (NO bullet
+                                // points, NO lists). Lead with the single
+                                // most specific observation you can defend
+                                // from the data. Mention the timing
+                                // signature and one concrete strength or
+                                // slip. End with a short, honest framing of
+                                // what the score actually means at this age.
+                                // No clichés, no "great job", no disclaimers,
+                                // no "overall you scored X out of Y".
 }
 
-Ground EVERY claim in the byDomain and items data. If the data doesn't
-support a claim, don't make it. Prefer "the data is inconclusive" over
-a fabricated pattern.`;
+Ground every claim in the data. If there's no signal, prefer a neutral
+observation ("steady across the test") over a fabricated pattern.`;
 
+  const userAge = Number(sessionStorage.getItem("iq_user_age")) || null;
   const user = `Raw local IQ estimate: ${stats.rawIQ}.
+Test-taker age: ${userAge ?? "unknown"}.
 Full session record:
 ${JSON.stringify(payload, null, 2)}
 
@@ -399,7 +349,7 @@ Analyse the pattern. Return the JSON per schema.`;
       ],
       response_format: { type: "json_object" },
       temperature: 0.35,
-      max_tokens: 900,
+      max_tokens: 380,
     }),
   });
 
@@ -550,95 +500,9 @@ async function fadeOutAnalyzer() {
 }
 
 /* ─── Final results render ─── */
-function renderResults({ iq, band, description, person, stats, ai, source }) {
+function renderResults({ iq, band, description, person, stats, source }) {
   const esc = (s) => String(s ?? "")
     .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-
-  /* Rich AI analysis blocks — only rendered when we actually got a response.
-     Each block is optional so a partial / degraded AI response still renders
-     gracefully (we never show empty cards). */
-  const aiBlocks = (() => {
-    if (!ai) return "";
-    const parts = [];
-
-    if (ai.cognitiveStyle) {
-      parts.push(`
-        <div class="ai-meta">
-          <span class="ai-meta__k">Cognitive style</span>
-          <span class="ai-meta__v">${esc(ai.cognitiveStyle)}</span>
-        </div>`);
-    }
-
-    if (ai.strongestDomain || ai.weakestDomain) {
-      parts.push(`
-        <div class="ai-domains">
-          ${ai.strongestDomain ? `
-            <div class="ai-domain ai-domain--up">
-              <span class="ai-domain__label">Strongest</span>
-              <span class="ai-domain__name">${esc(ai.strongestDomain)}</span>
-            </div>` : ""}
-          ${ai.weakestDomain ? `
-            <div class="ai-domain ai-domain--down">
-              <span class="ai-domain__label">Room to grow</span>
-              <span class="ai-domain__name">${esc(ai.weakestDomain)}</span>
-            </div>` : ""}
-        </div>`);
-    }
-
-    if (Array.isArray(ai.strengths) && ai.strengths.length) {
-      parts.push(`
-        <div class="ai-list">
-          <span class="ai-list__label">Strengths</span>
-          <ul class="ai-list__items">
-            ${ai.strengths.slice(0, 3).map(s => `<li>${esc(s)}</li>`).join("")}
-          </ul>
-        </div>`);
-    }
-
-    if (Array.isArray(ai.growthAreas) && ai.growthAreas.length) {
-      parts.push(`
-        <div class="ai-list ai-list--growth">
-          <span class="ai-list__label">Growth areas</span>
-          <ul class="ai-list__items">
-            ${ai.growthAreas.slice(0, 2).map(s => `<li>${esc(s)}</li>`).join("")}
-          </ul>
-        </div>`);
-    }
-
-    if (ai.timePattern) {
-      parts.push(`
-        <div class="ai-insight">
-          <span class="ai-insight__label">Timing</span>
-          <p class="ai-insight__text">${esc(ai.timePattern)}</p>
-        </div>`);
-    }
-
-    if (ai.notablePattern) {
-      parts.push(`
-        <div class="ai-insight ai-insight--notable">
-          <span class="ai-insight__label">Notable pattern</span>
-          <p class="ai-insight__text">${esc(ai.notablePattern)}</p>
-        </div>`);
-    }
-
-    if (typeof ai.consistencyScore === "number") {
-      const c = Math.max(0, Math.min(100, Math.round(ai.consistencyScore)));
-      parts.push(`
-        <div class="ai-consistency">
-          <div class="ai-consistency__head">
-            <span class="ai-consistency__label">Consistency across domains</span>
-            <span class="ai-consistency__val">${c}<span class="ai-consistency__unit">/100</span></span>
-          </div>
-          <div class="ai-consistency__track">
-            <div class="ai-consistency__fill" style="width:${c}%"></div>
-          </div>
-        </div>`);
-    }
-
-    return parts.length
-      ? `<div class="ai-analysis">${parts.join("")}</div>`
-      : "";
-  })();
 
   /* Dramatic staged reveal:
      Stage 1 — "Your IQ is…" preamble → number counts up → band → button
@@ -679,7 +543,7 @@ function renderResults({ iq, band, description, person, stats, ai, source }) {
         <button class="btn btn--primary reveal-btn" id="show-more">Show more</button>
       </section>
 
-      <!-- STAGE 2: stats + rich AI analysis -->
+      <!-- STAGE 2: stats + single readable paragraph -->
       <section class="reveal-stage reveal-stage--two" id="rs-stats" hidden>
         <div class="rs-stats-grid">
           <div class="rs-stat">
@@ -698,7 +562,6 @@ function renderResults({ iq, band, description, person, stats, ai, source }) {
           </div>
         </div>
         <p class="reveal-desc">${esc(description)}</p>
-        ${aiBlocks}
         <button class="btn btn--primary" id="show-person">Next</button>
       </section>
 

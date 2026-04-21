@@ -188,13 +188,6 @@ function render() {
   const locked = state.committed[state.index];  // view-only on revisit
   state.startTimes[state.index] = state.startTimes[state.index] || Date.now();
 
-  /* Sweep any floating calculator from a previous series question.
-     The series calculator lives on <body> (see js/questions/series.js for
-     why — transform-based containing-block trap), so swapping #app's
-     innerHTML doesn't remove it. Strip it here before every render; the
-     series question re-creates it from its own template if needed. */
-  document.querySelectorAll("body > .calc").forEach(el => el.remove());
-
   root.innerHTML = `
     <div class="test-shell">
       ${renderHeader()}

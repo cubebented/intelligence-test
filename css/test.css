@@ -1417,10 +1417,68 @@
 .landing__cta {
   display: flex;
   gap: var(--s-3);
-  margin-top: var(--s-8);
+  margin-top: var(--s-5);
   align-items: center;
   flex-wrap: wrap;
 }
+
+/* Age input — sits above the Begin button. Quiet chrome, warm focus. */
+.landing__age {
+  margin-top: var(--s-7);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+}
+.landing__age-label {
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.landing__age-row {
+  display: flex;
+  align-items: center;
+  gap: var(--s-4);
+  flex-wrap: wrap;
+}
+.landing__age-input {
+  width: 96px;
+  padding: 10px 14px;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-sm);
+  font-family: var(--font-display);
+  font-size: var(--fs-lg);
+  font-weight: 500;
+  text-align: center;
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+  transition:
+    border-color var(--d-fast) var(--ease-out),
+    background var(--d-fast) var(--ease-out);
+  /* Hide the native number-input spinner — ugly in dark mode */
+  -moz-appearance: textfield;
+}
+.landing__age-input::-webkit-outer-spin-button,
+.landing__age-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.landing__age-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  background: var(--surface-raised);
+}
+.landing__age-hint {
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  color: var(--text-faint);
+  letter-spacing: 0.04em;
+  transition: color var(--d-fast) var(--ease-out);
+}
+.landing__age-hint--err { color: var(--err); }
 
 .landing__hero-art {
   aspect-ratio: 1;
@@ -2571,207 +2629,20 @@
   animation: fade-up 700ms var(--ease-out) 4250ms forwards;
 }
 
-/* Stage 2 — description sits UNDER the big stats */
+/* Stage 2 — description sits UNDER the big stats.
+   This paragraph IS the AI analysis now (no cards, no lists), so give
+   it proper reading chrome: wider line-height, generous max-width,
+   warmer text colour so it reads like editorial prose, not a caption. */
 .reveal-desc {
-  color: var(--text-secondary);
-  max-width: 48ch;
-  margin: 0 auto;
-  line-height: 1.55;
+  color: var(--text);
+  max-width: 54ch;
+  margin: var(--s-2) auto 0;
+  padding: 0 var(--s-4);
+  line-height: 1.65;
   font-size: var(--fs-md);
-}
-
-/* ═══════════════════════════════════════════════════════════════════════
-   AI analysis blocks (stage 2) — rich card read of the session.
-   Each block renders only when the model returns its field, so layout is
-   resilient to partial responses. Everything is left-aligned inside a
-   centered 640-px column — reads like a tiny report card, not a hero.
-   ═══════════════════════════════════════════════════════════════════════ */
-.ai-analysis {
-  display: flex;
-  flex-direction: column;
-  gap: var(--s-5);
-  width: 100%;
-  max-width: 640px;
-  margin: var(--s-4) auto 0;
+  font-weight: 350;
+  letter-spacing: -0.002em;
   text-align: left;
-}
-
-/* Cognitive-style pill — small header-style meta row */
-.ai-meta {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  padding: var(--s-3) 0;
-  border-bottom: 1px solid var(--border);
-  gap: var(--s-4);
-}
-.ai-meta__k {
-  font-family: var(--font-mono);
-  font-size: var(--fs-xs);
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-}
-.ai-meta__v {
-  font-family: var(--font-display);
-  font-size: var(--fs-md);
-  color: var(--accent);
-  font-weight: 500;
-  letter-spacing: -0.01em;
-}
-
-/* Strongest / weakest domain cards — two-up grid */
-.ai-domains {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--s-3);
-}
-.ai-domain {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: var(--s-4);
-  background: var(--surface-raised);
-  border: 1px solid var(--border);
-  border-radius: var(--r-md);
-}
-.ai-domain__label {
-  font-family: var(--font-mono);
-  font-size: var(--fs-xs);
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-}
-.ai-domain--up   .ai-domain__label { color: var(--ok); }
-.ai-domain--down .ai-domain__label { color: var(--warn); }
-.ai-domain__name {
-  font-family: var(--font-display);
-  font-size: var(--fs-md);
-  color: var(--text);
-  font-weight: 500;
-  letter-spacing: -0.005em;
-}
-
-/* Strength / growth-area bullet lists */
-.ai-list {
-  display: flex;
-  flex-direction: column;
-  gap: var(--s-2);
-}
-.ai-list__label {
-  font-family: var(--font-mono);
-  font-size: var(--fs-xs);
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--accent);
-}
-.ai-list--growth .ai-list__label { color: var(--warn); }
-.ai-list__items {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-.ai-list__items li {
-  padding-left: var(--s-4);
-  position: relative;
-  color: var(--text-secondary);
-  font-size: var(--fs-sm);
-  line-height: 1.5;
-}
-.ai-list__items li::before {
-  content: "";
-  position: absolute;
-  left: 4px;
-  top: 0.65em;
-  width: 6px;
-  height: 1px;
-  background: var(--accent-dim);
-}
-.ai-list--growth .ai-list__items li::before { background: var(--warn); }
-
-/* Insight blocks (timing + notable pattern) — left-rule callouts */
-.ai-insight {
-  padding: var(--s-3) var(--s-4);
-  border-left: 2px solid var(--border-strong);
-}
-.ai-insight--notable { border-left-color: var(--accent); }
-.ai-insight__label {
-  display: block;
-  font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-}
-.ai-insight--notable .ai-insight__label { color: var(--accent); }
-.ai-insight__text {
-  margin: 6px 0 0;
-  color: var(--text);
-  font-size: var(--fs-sm);
-  line-height: 1.55;
-  max-width: none;              /* override the 65ch default on p */
-}
-
-/* Consistency meter — horizontal bar beneath the numeric readout */
-.ai-consistency {
-  display: flex;
-  flex-direction: column;
-  gap: var(--s-2);
-  padding-top: var(--s-4);
-  border-top: 1px solid var(--border);
-}
-.ai-consistency__head {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: var(--s-3);
-}
-.ai-consistency__label {
-  font-family: var(--font-mono);
-  font-size: var(--fs-xs);
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-}
-.ai-consistency__val {
-  font-family: var(--font-display);
-  font-size: var(--fs-lg);
-  font-weight: 500;
-  color: var(--accent);
-  font-variant-numeric: tabular-nums;
-  letter-spacing: -0.02em;
-}
-.ai-consistency__unit {
-  font-size: var(--fs-sm);
-  color: var(--text-muted);
-  margin-left: 2px;
-  letter-spacing: 0;
-}
-.ai-consistency__track {
-  height: 3px;
-  background: var(--border);
-  border-radius: var(--r-full);
-  overflow: hidden;
-}
-.ai-consistency__fill {
-  height: 100%;
-  /* width is set inline via style="width:${c}%" — animation here is the
-     appearance only: scale from 0 → 1 along the x-axis so the bar fills in. */
-  background: linear-gradient(90deg, var(--accent-dim), var(--accent));
-  transform-origin: left center;
-  animation: ai-consistency-fill 900ms var(--ease-out) 300ms both;
-}
-@keyframes ai-consistency-fill {
-  from { transform: scaleX(0); }
-  to   { transform: scaleX(1); }
-}
-
-@media (max-width: 560px) {
-  .ai-domains { grid-template-columns: 1fr; }
-  .ai-meta { flex-direction: column; align-items: flex-start; gap: var(--s-1); }
 }
 
 /* Stage 3 — celebrity framing */
